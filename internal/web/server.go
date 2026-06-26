@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -28,8 +29,12 @@ type Backups interface {
 	ListSnapshots(ctx context.Context, ns string) ([]kopia.SnapshotInfo, error)
 	Dir(ctx context.Context, ns, snapID, path string) ([]kopia.DirEntry, error)
 	// OpenFile returns a seekable stream for a single file within a snapshot
-	// plus its metadata. Caller must Close the reader.
+	// plus its metadata. Caller must Close the reader. Returns kopia.ErrNotAFile
+	// when the path resolves to a directory (including empty path = root).
 	OpenFile(ctx context.Context, ns, snapID, path string) (io.ReadSeekCloser, kopia.DirEntry, error)
+	// TarDir streams a plain tar archive of the directory subtree rooted at path
+	// (empty = snapshot root) into w.
+	TarDir(ctx context.Context, ns, snapID, path string, w io.Writer) error
 }
 
 // crumb is one level of the directory breadcrumb.
@@ -176,9 +181,12 @@ func (s *server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "browse.html", data)
 }
 
-// handleDownload streams a single file from a snapshot to the browser.
-// It uses http.ServeContent so the response includes Content-Type (sniffed
-// from extension/content), Content-Length, Last-Modified and Range support.
+// handleDownload serves a snapshot entry as a download.
+//   - Regular file: Content-Disposition + http.ServeContent (Range / sniffed Content-Type).
+//   - Directory (incl. empty path = snapshot root): plain tar archive streamed directly.
+//
+// The same route handles both cases; the distinction is made by calling OpenFile
+// first — ErrNotAFile signals a directory and triggers the tar path.
 func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	ns := r.PathValue("ns")
 	snapID := r.PathValue("id")
@@ -189,27 +197,38 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, http.StatusBadRequest, "invalid path", err)
 		return
 	}
-	if cleanPath == "" {
-		s.renderError(w, http.StatusBadRequest, "invalid path", fmt.Errorf("path is required"))
-		return
-	}
+	// Empty cleanPath is valid: it means "download the entire snapshot root as tar".
+	// OpenFile returns ErrNotAFile for any directory (including root), which
+	// triggers the tar branch below.
 
-	rc, entry, err := s.backups.OpenFile(r.Context(), ns, snapID, cleanPath)
-	if err != nil {
-		if errors.Is(err, kopia.ErrNotFound) || errors.Is(err, kopia.ErrNotAFile) {
-			s.renderError(w, http.StatusNotFound, "not found", err)
-			return
+	rc, entry, fileErr := s.backups.OpenFile(r.Context(), ns, snapID, cleanPath)
+	switch {
+	case fileErr == nil:
+		// Regular file: serve with full HTTP machinery (Range, Content-Type, etc.).
+		defer rc.Close()
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, entry.Name))
+		http.ServeContent(w, r, entry.Name, entry.ModTime, rc)
+
+	case errors.Is(fileErr, kopia.ErrNotAFile):
+		// Directory: stream a plain tar archive.
+		base := path.Base(cleanPath)
+		if cleanPath == "" {
+			base = ns // root download → "<namespace>.tar"
 		}
-		s.renderError(w, http.StatusInternalServerError, "opening file", err)
-		return
-	}
-	defer rc.Close()
+		tarName := base + ".tar"
+		w.Header().Set("Content-Type", "application/x-tar")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, tarName))
+		if terr := s.backups.TarDir(r.Context(), ns, snapID, cleanPath, w); terr != nil {
+			// Headers (and possibly some bytes) are already sent; cannot change status.
+			log.Printf("handleDownload: tar %s/%s/%s: %v", ns, snapID, cleanPath, terr)
+		}
 
-	// Content-Disposition forces a browser download with the original filename.
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, entry.Name))
-	// ServeContent handles Content-Type (extension sniff), Content-Length,
-	// Last-Modified and Range requests automatically.
-	http.ServeContent(w, r, entry.Name, entry.ModTime, rc)
+	case errors.Is(fileErr, kopia.ErrNotFound):
+		s.renderError(w, http.StatusNotFound, "not found", fileErr)
+
+	default:
+		s.renderError(w, http.StatusInternalServerError, "opening file", fileErr)
+	}
 }
 
 // cleanBrowsePath normalises a user-supplied path value from the URL.

@@ -7,6 +7,7 @@
   {{range $i, $c := .Crumbs}}{{if $i}} / {{end}}{{if $c.Href}}<a href="{{$c.Href}}">{{$c.Name}}</a>{{else}}{{$c.Name}}{{end}}{{end}}
 </nav>
 <h1>{{.Namespace}} — {{if .Path}}{{.Path}}{{else}}root{{end}}</h1>
+<a class="btn-download-folder" href="{{.DownloadBase}}/">Download this folder (.tar)</a>
 {{if .Entries}}
 <table class="entries">
   <thead>
@@ -17,7 +18,7 @@
     <tr>
       {{if .IsDir}}
         <td class="entry-dir"><a href="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-get="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-target="#listing" hx-push-url="true">{{.Name}}/</a></td>
-        <td>—</td>
+        <td><a class="tar-link" href="{{$.DownloadBase}}/{{urlPathEscape .Name}}">tar</a></td>
       {{else}}
         <td class="entry-file"><a href="{{$.DownloadBase}}/{{urlPathEscape .Name}}">{{.Name}}</a></td>
         <td>{{humanBytes .Size}}</td>

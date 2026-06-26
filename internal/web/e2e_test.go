@@ -146,6 +146,48 @@ func TestE2EDownloadLink(t *testing.T) {
 	}
 }
 
+// TestE2EFolderTarLink checks that directory rows have a tar download link
+// and that the current-folder download button is present on the browse page.
+func TestE2EFolderTarLink(t *testing.T) {
+	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	defer srv.Close()
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.NoSandbox,
+	)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAlloc()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+	ctx, cancelTimeout := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelTimeout()
+
+	var tarLinkHref, folderBtnHref string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(srv.URL+"/repo/paperless/snap/snap-1/browse/"),
+		chromedp.WaitVisible(`table.entries`, chromedp.ByQuery),
+		// tar link on the first dir row (second td, sibling of .entry-dir).
+		chromedp.AttributeValue(`table.entries .tar-link`, "href", &tarLinkHref, nil, chromedp.ByQuery),
+		// current-folder download button.
+		chromedp.AttributeValue(`.btn-download-folder`, "href", &folderBtnHref, nil, chromedp.ByQuery),
+	)
+	if err != nil {
+		if isNoBrowser(err) {
+			t.Skipf("no Chrome/Chromium available for E2E: %v", err)
+		}
+		t.Fatalf("chromedp run: %v", err)
+	}
+
+	if !strings.Contains(tarLinkHref, "/download/") {
+		t.Errorf("dir tar link href = %q, expected to contain /download/", tarLinkHref)
+	}
+	if !strings.Contains(folderBtnHref, "/download/") {
+		t.Errorf("folder download button href = %q, expected to contain /download/", folderBtnHref)
+	}
+}
+
 func isNoBrowser(err error) bool {
 	s := err.Error()
 	return strings.Contains(s, "executable file not found") ||

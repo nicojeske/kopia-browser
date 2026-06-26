@@ -3,6 +3,8 @@
 package kopia_test
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -181,6 +183,63 @@ func TestOpenFileLive(t *testing.T) {
 	}
 	if int64(len(data)) != entry.Size {
 		t.Errorf("read %d bytes, expected entry.Size %d", len(data), entry.Size)
+	}
+}
+
+func TestTarDirLive(t *testing.T) {
+	mgr, _ := testManager(t)
+	ctx := context.Background()
+
+	snaps, err := mgr.ListSnapshots(ctx, "paperless")
+	if err != nil {
+		t.Fatalf("ListSnapshots: %v", err)
+	}
+	if len(snaps) == 0 {
+		t.Skip("no snapshots in paperless")
+	}
+	snapID := snaps[0].ID
+
+	// Find a subdirectory to tar (fall back to root if none).
+	entries, err := mgr.Dir(ctx, "paperless", snapID, "")
+	if err != nil {
+		t.Fatalf("Dir(root): %v", err)
+	}
+	var subDirName string
+	for _, e := range entries {
+		if e.IsDir {
+			subDirName = e.Name
+			break
+		}
+	}
+
+	t.Logf("taring %q", subDirName)
+	var buf bytes.Buffer
+	if err := mgr.TarDir(ctx, "paperless", snapID, subDirName, &buf); err != nil {
+		t.Fatalf("TarDir(%q): %v", subDirName, err)
+	}
+
+	tarBytes := buf.Len()
+	t.Logf("tar size: %d bytes", tarBytes)
+	if tarBytes == 0 {
+		t.Fatal("tar output is empty")
+	}
+
+	// Parse the tar and count entries.
+	tr := tar.NewReader(&buf)
+	count := 0
+	for {
+		_, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar.Next: %v", err)
+		}
+		count++
+	}
+	t.Logf("tar entries: %d", count)
+	if count == 0 {
+		t.Error("tar has no entries")
 	}
 }
 

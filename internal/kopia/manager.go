@@ -1,10 +1,12 @@
 package kopia
 
 import (
+	"archive/tar"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -166,10 +168,21 @@ func (m *Manager) open(ctx context.Context, ns string) (repo.Repository, error) 
 	return rep, nil
 }
 
-// Dir lists the entries of a directory within a snapshot. path is the
-// slash-separated path from the snapshot root (empty string = root). The caller
-// must supply a clean path with no ".." segments (see web.cleanBrowsePath).
-func (m *Manager) Dir(ctx context.Context, ns, snapID, path string) ([]DirEntry, error) {
+// ErrNotFound is returned when any segment of the path does not exist in the snapshot.
+var ErrNotFound = errors.New("not found")
+
+// ErrNotAFile is returned by OpenFile when the final path segment resolves to
+// a directory. The download handler uses this to branch to the tar streaming path.
+var ErrNotAFile = errors.New("path is a directory, not a file")
+
+// ErrNotADirectory is returned by TarDir when the path resolves to a file
+// rather than a directory.
+var ErrNotADirectory = errors.New("path is not a directory")
+
+// descendToDir opens the snapshot root and walks dirPath segment-by-segment,
+// returning the kopiafs.Directory at that location (empty dirPath = root).
+// Maps kopiafs.ErrEntryNotFound → ErrNotFound; a non-directory segment → ErrNotADirectory.
+func (m *Manager) descendToDir(ctx context.Context, ns, snapID, dirPath string) (kopiafs.Directory, error) {
 	rep, err := m.open(ctx, ns)
 	if err != nil {
 		return nil, err
@@ -190,19 +203,35 @@ func (m *Manager) Dir(ctx context.Context, ns, snapID, path string) ([]DirEntry,
 		return nil, fmt.Errorf("snapshot root of %q is not a directory", snapID)
 	}
 
-	// Descend into the requested path one segment at a time.
-	if path != "" {
-		for _, seg := range strings.Split(path, "/") {
-			child, err := dir.Child(ctx, seg)
-			if err != nil {
-				return nil, fmt.Errorf("navigate to %q: %w", seg, err)
+	if dirPath == "" {
+		return dir, nil
+	}
+
+	for _, seg := range strings.Split(dirPath, "/") {
+		child, err := dir.Child(ctx, seg)
+		if err != nil {
+			if errors.Is(err, kopiafs.ErrEntryNotFound) {
+				return nil, fmt.Errorf("navigate to %q: %w", seg, ErrNotFound)
 			}
-			childDir, ok := child.(kopiafs.Directory)
-			if !ok {
-				return nil, fmt.Errorf("%q is not a directory", seg)
-			}
-			dir = childDir
+			return nil, fmt.Errorf("navigate to %q: %w", seg, err)
 		}
+		childDir, ok := child.(kopiafs.Directory)
+		if !ok {
+			return nil, fmt.Errorf("%q is not a directory: %w", seg, ErrNotADirectory)
+		}
+		dir = childDir
+	}
+
+	return dir, nil
+}
+
+// Dir lists the entries of a directory within a snapshot. path is the
+// slash-separated path from the snapshot root (empty string = root). The caller
+// must supply a clean path with no ".." segments (see web.cleanBrowsePath).
+func (m *Manager) Dir(ctx context.Context, ns, snapID, path string) ([]DirEntry, error) {
+	dir, err := m.descendToDir(ctx, ns, snapID, path)
+	if err != nil {
+		return nil, err
 	}
 
 	entries, err := kopiafs.GetAllEntries(ctx, dir)
@@ -230,13 +259,89 @@ func (m *Manager) Dir(ctx context.Context, ns, snapID, path string) ([]DirEntry,
 	return out, nil
 }
 
-// ErrNotFound is returned by OpenFile when any segment of the path does not
-// exist in the snapshot.
-var ErrNotFound = errors.New("not found")
+// TarDir streams a plain tar archive of the directory subtree rooted at dirPath
+// into w. dirPath is the slash-separated path from the snapshot root (empty = root).
+// Returns ErrNotFound when any path segment is absent, ErrNotADirectory when
+// the path resolves to a file rather than a directory.
+func (m *Manager) TarDir(ctx context.Context, ns, snapID, dirPath string, w io.Writer) error {
+	dir, err := m.descendToDir(ctx, ns, snapID, dirPath)
+	if err != nil {
+		return err
+	}
+	tw := tar.NewWriter(w)
+	if err := writeTarTree(ctx, tw, dir, ""); err != nil {
+		return err
+	}
+	return tw.Close()
+}
 
-// ErrNotAFile is returned by OpenFile when the final path segment resolves to
-// a directory. Use the forthcoming folder-download route (M4) for directories.
-var ErrNotAFile = errors.New("path is a directory, not a file")
+// writeTarTree recursively writes the directory dir into tw.
+// prefix is the slash-separated path prefix prepended to each entry name.
+func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, prefix string) error {
+	return kopiafs.IterateEntries(ctx, dir, func(ctx context.Context, e kopiafs.Entry) error {
+		name := e.Name()
+		if prefix != "" {
+			name = prefix + "/" + name
+		}
+
+		switch v := e.(type) {
+		case kopiafs.Directory:
+			hdr, err := tar.FileInfoHeader(e, "")
+			if err != nil {
+				return fmt.Errorf("tar header for dir %q: %w", name, err)
+			}
+			hdr.Name = name + "/"
+			if err := tw.WriteHeader(hdr); err != nil {
+				return fmt.Errorf("write tar header for dir %q: %w", name, err)
+			}
+			return writeTarTree(ctx, tw, v, name)
+
+		case kopiafs.File:
+			hdr, err := tar.FileInfoHeader(e, "")
+			if err != nil {
+				return fmt.Errorf("tar header for file %q: %w", name, err)
+			}
+			hdr.Name = name
+			hdr.Size = e.Size()
+			if err := tw.WriteHeader(hdr); err != nil {
+				return fmt.Errorf("write tar header for file %q: %w", name, err)
+			}
+			rc, err := v.Open(ctx)
+			if err != nil {
+				return fmt.Errorf("open file %q: %w", name, err)
+			}
+			_, copyErr := io.Copy(tw, rc)
+			closeErr := rc.Close()
+			if copyErr != nil {
+				return fmt.Errorf("copy file %q: %w", name, copyErr)
+			}
+			return closeErr
+
+		case kopiafs.Symlink:
+			link, err := v.Readlink(ctx)
+			if err != nil {
+				log.Printf("kopia/tar: readlink %q: %v; skipping", name, err)
+				return nil
+			}
+			hdr := &tar.Header{
+				Typeflag: tar.TypeSymlink,
+				Name:     name,
+				Linkname: link,
+				ModTime:  e.ModTime(),
+				Mode:     0o777,
+			}
+			if err := tw.WriteHeader(hdr); err != nil {
+				return fmt.Errorf("write tar header for symlink %q: %w", name, err)
+			}
+			return nil
+
+		default:
+			// StreamingFile and other unknown types are uncommon in volume backups.
+			log.Printf("kopia/tar: skipping entry %q (type %T)", name, e)
+			return nil
+		}
+	})
+}
 
 // OpenFile opens a single file within a snapshot for reading. path must be a
 // slash-separated path from the snapshot root pointing at a regular file (not

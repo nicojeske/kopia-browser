@@ -187,10 +187,24 @@ func TestHandlers(t *testing.T) {
 			wantHeader:  map[string]string{"Content-Disposition": "export.csv"},
 		},
 		{
-			name:       "download empty path rejected",
+			name:       "download root path yields whole-snapshot tar",
 			target:     "/repo/paperless/snap/snap-1/download/",
 			backups:    sampleData(),
-			wantStatus: http.StatusBadRequest,
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{
+				"Content-Type":        "application/x-tar",
+				"Content-Disposition": "paperless.tar",
+			},
+		},
+		{
+			name:       "download folder path yields tar",
+			target:     "/repo/paperless/snap/snap-1/download/data",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{
+				"Content-Type":        "application/x-tar",
+				"Content-Disposition": "data.tar",
+			},
 		},
 		{
 			name:       "download missing file yields 404",
@@ -199,11 +213,21 @@ func TestHandlers(t *testing.T) {
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			name:       "download data error yields 500",
-			target:     "/repo/paperless/snap/snap-1/download/config.yaml",
-			backups:    fakeBackups{err: errors.New("storage down")},
-			wantStatus: http.StatusInternalServerError,
+			name:        "download data error yields 500",
+			target:      "/repo/paperless/snap/snap-1/download/config.yaml",
+			backups:     fakeBackups{err: errors.New("storage down")},
+			wantStatus:  http.StatusInternalServerError,
 			wantContain: []string{"storage down"},
+		},
+		{
+			name:       "browse root listing has folder tar links",
+			target:     "/repo/paperless/snap/snap-1/browse/",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantContain: []string{
+				"/download/data",       // tar link for "data" dir row
+				"btn-download-folder",  // current-folder download button
+			},
 		},
 	}
 

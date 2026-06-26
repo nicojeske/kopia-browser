@@ -2,6 +2,13 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-06-26 — M4 folder tar download
+- **Same `/download/{path...}` route for both files and directories.** No extra route, no query param. The handler calls `OpenFile` first; `ErrNotAFile` returned for any directory (incl. empty path = snapshot root) triggers the tar branch. Clean branching on sentinel errors; no extra round trip.
+- **`io.Writer` signature for `TarDir` (not `io.Pipe`).** Handler sets headers, then calls `TarDir(ctx, ns, snapID, path, w)`. Backpressure is trivial (handler blocks on write), no goroutine needed. Content-Length is unknown so chunked transfer encoding is used automatically by Go's `http.ResponseWriter`.
+- **Plain (uncompressed) tar.** kopia already compresses blocks internally; re-gzip would gain little on many file types and costs CPU per request. Extension `.tar`, `Content-Type: application/x-tar`.
+- **`descendToDir` helper extracted.** `Dir` and `TarDir` both descend to a directory; the shared logic is now in a single private method, mapping `kopiafs.ErrEntryNotFound → ErrNotFound` and non-dir segment → `ErrNotADirectory`. `OpenFile` is intentionally not changed (it descends to the parent and resolves the last segment separately — different shape).
+- **`kopiafs.IterateEntries` for tree walk (not `GetAllEntries`).** Streaming callback avoids materializing a slice for each directory level; better for deep trees. Symlinks are written to the tar (TypeSymlink + Readlink target); unknown types are logged and skipped.
+
 ## 2026-06-26 — M2 browse + SPA navigation
 - **htmx partial swap with `hx-push-url`** for dir navigation. Handler branches on `HX-Request: true` header: htmx gets only the `browse-content` fragment (inner HTML of `#listing`); plain browser gets the full `browse.html` page. `hx-push-url="true"` keeps the URL bar in sync so the back button works and links are shareable. `href` fallback on every dir link means navigation works without JS.
 - **Path sanitization in handler layer** (`cleanBrowsePath`). `{path...}` URL wildcard value is attacker-controllable. Strategy: prefix `"/"` + `path.Clean` (resolves `..` safely by treating as absolute) → strip leading `/`. After clean, `..` cannot escape root. Defensive segment check added as belt-and-suspenders. No existing sanitizer existed; new unit test covers edge cases.

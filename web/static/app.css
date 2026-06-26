@@ -45,3 +45,15 @@ table.entries th { font-size: .8rem; text-transform: uppercase; letter-spacing: 
 .entry-file a:hover { text-decoration: underline; }
 .muted { opacity: .6; font-family: ui-monospace, monospace; font-size: .85em; }
 .empty { opacity: .7; }
+.btn-download-folder {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: .3rem .7rem;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: .4rem;
+  font-size: .85rem;
+  text-decoration: none;
+}
+.btn-download-folder:hover { background: color-mix(in srgb, CanvasText 8%, transparent); }
+.tar-link { font-size: .8rem; opacity: .7; }
+.tar-link:hover { opacity: 1; }

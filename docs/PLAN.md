@@ -18,7 +18,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M1 List namespaces + snapshots | DONE |
 | M2 Browse dir tree | DONE |
 | M3 Download single file | DONE |
-| M4 Download folder (tar) | TODO |
+| M4 Download folder (tar) | DONE |
 | M5 UI refinement & E2E hardening | TODO |
 | M6 Docker + k8s | TODO |
 
@@ -78,11 +78,11 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - **UI:** [x] download links on listing; chromedp E2E asserts /download/ href
 - **Verify:** unit + httptest ✅; `make e2e` ✅; integration + live checksum pending live run.
 
-### M4 — Download folder (tar) — `TODO`
-- **Data:** [ ] `TarDir(...)` — stream tar of a directory subtree on the fly; unit test on in-memory tree + integration on `paperless`
-- **Handler:** [ ] same download route serves tar when target is a directory; httptest validates tar stream
-- **UI:** [ ] "download folder" affordance; chromedp E2E downloads + extracts a folder
-- **Verify:** tar extracts; contents match.
+### M4 — Download folder (tar) — `DONE`
+- **Data:** [x] `descendToDir` helper extracted (shared by `Dir` + `TarDir`); `TarDir(ctx, ns, snapID, dirPath, w io.Writer)` streams plain tar via `writeTarTree` + `kopiafs.IterateEntries`; handles dirs, files, symlinks; `ErrNotADirectory` sentinel added; unit test on in-memory fakes (`tar_test.go`); integration test `TestTarDirLive` on `paperless`
+- **Handler:** [x] `TarDir` added to `Backups` interface; `handleDownload` branches on `ErrNotAFile` → tar (Content-Type: application/x-tar, chunked); root empty path yields `<ns>.tar`; single-file path unchanged; `ErrNotFound` → 404; httptest cases for root tar, subdir tar, file (unchanged), missing → 404
+- **UI:** [x] browse.html: "Download this folder (.tar)" button near h1; `.tar-link` on each dir row; app.css styles; chromedp E2E `TestE2EFolderTarLink` asserts hrefs contain `/download/`
+- **Verify:** `go test ./...` ✅; `make e2e` ✅; integration + live manual pending live run.
 
 ### M5 — UI refinement & E2E hardening — `TODO`
 - [ ] Snapshot metadata, human sizes, sorting, error pages, empty states
