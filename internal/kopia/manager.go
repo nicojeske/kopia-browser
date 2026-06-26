@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -106,10 +107,21 @@ func (m *Manager) ListSnapshots(ctx context.Context, ns string) ([]SnapshotInfo,
 
 	out := make([]SnapshotInfo, 0, len(mans))
 	for _, man := range mans {
+		// Pod-volume-backup sets Tags["volume"]; data-mover snapshots do not.
+		// For data-mover, the PVC name is the last segment of source.path:
+		//   "snapshot-data-upload-download/kopia/<ns>/<pvc-name>"
+		volume := man.Tags["volume"]
+		if volume == "" && man.Source.Path != "" {
+			base := path.Base(man.Source.Path)
+			if base != "." && base != "/" {
+				volume = base
+			}
+		}
+
 		out = append(out, SnapshotInfo{
 			ID:         string(man.ID),
 			BackupName: man.Tags["backup"],
-			Volume:     man.Tags["volume"],
+			Volume:     volume,
 			StartTime:  man.StartTime.ToTime(),
 			EndTime:    man.EndTime.ToTime(),
 			TotalSize:  man.Stats.TotalFileSize,

@@ -40,6 +40,28 @@ Each snapshot object:
 - `tags` — friendly Velero metadata: `backup` (backup name), `ns`, `pod`, `volume`, `snapshot-uploader` → **show these in UI**
 - `pins`, `retentionReason`
 
+## Two distinct Velero snapshot schemas (verified live 2026-06-26)
+
+Velero uses **two different mechanisms** for kopia snapshots; they produce different tag sets and source paths.
+
+### 1. Pod-volume-backup (e.g. `paperless`)
+- `snapshot-requester: pod-volume-backup-restore`
+- Tags: `backup`, `backup-uid`, `ns`, `pod`, `pod-uid`, `snapshot-uploader` (`kopia`), **`volume`** (PVC name)
+- `source.path`: ugly host-pod path like `/host_pods/<uid>/volumes/kubernetes.io~empty-dir/backup` — do NOT show in UI
+- Volume grouping: use `Tags["volume"]` directly.
+
+### 2. Data mover / CSI snapshot (e.g. `media`)
+- `snapshot-requester: snapshot-data-upload-download`
+- Tags: `snapshot-uploader` (`kopia`), `velero.io/async-operation-id` (`du-<uuid>.<suffix>`); **no `volume` tag**
+- `source.path`: `snapshot-data-upload-download/kopia/<ns>/<pvc-name>` — last segment IS the PVC/volume name
+- Volume grouping: `path.Base(source.path)` when `Tags["volume"]` is empty.
+- `rootEntry.Name`: a UUID per snapshot (DataUpload UID), not meaningful for the UI.
+- `BackupName` (`Tags["backup"]`): always empty for data mover snapshots.
+
+Verified live in `media` namespace (238 snapshots, 9 distinct PVCs):
+`arr-claim`, `audiobookshelf-claim`, `bookorbit-claim`, `kavita-claim`, `media`,
+`media-bookorbit-db-1`, `media-dispatcharr-db-1`, `plex-claim`, `stash-claim`.
+
 ## Go library notes (verified M1 against `github.com/kopia/kopia v0.22.3`)
 
 - **Library pinned:** `github.com/kopia/kopia v0.22.3` (matches CLI 0.22.3).

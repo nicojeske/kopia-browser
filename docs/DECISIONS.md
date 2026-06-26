@@ -8,6 +8,7 @@
 - **`{volume...}` wildcard route** (`/repo/{ns}/vol/{volume...}`). The wildcard can be empty, so `/repo/ns/vol/` routes to volume="" (snapshots missing the volume tag). Named volumes are single path segments (Velero uses DNS-valid PVC names, no slashes).
 - **"(no volume)" sentinel display only, never in URLs.** Snapshots with `Tags["volume"]==""` are shown under "(no volume)" in the UI but linked to `/repo/{ns}/vol/` (empty tail), not to a URL containing the literal string "(no volume)". Keeps URLs clean and avoids double-decode issues.
 - **Alphabetical sort, empty name last.** Volumes sorted alphabetically; untagged ("") bucket comes last since it is the exception rather than the rule.
+- **`source.path` fallback for data-mover snapshots.** Velero data-mover repos (e.g. `media`) set `source.path = "snapshot-data-upload-download/kopia/<ns>/<pvc-name>"` but carry no `Tags["volume"]`. `ListSnapshots` falls back to `path.Base(man.Source.Path)` when `Tags["volume"]` is empty — this correctly extracts the PVC name. Pod-volume-backup repos (e.g. `paperless`) always have `Tags["volume"]` set so they are unaffected.
 
 ## 2026-06-26 — M4 folder tar download
 - **Same `/download/{path...}` route for both files and directories.** No extra route, no query param. The handler calls `OpenFile` first; `ErrNotAFile` returned for any directory (incl. empty path = snapshot root) triggers the tar branch. Clean branching on sentinel errors; no extra round trip.
