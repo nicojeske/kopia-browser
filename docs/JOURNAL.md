@@ -1,5 +1,12 @@
 # Session journal
 
+## 2026-06-26 — M3 Download single file (DONE)
+- **Done:** Full 3-layer M3. Data: `OpenFile(ctx, ns, snapID, path)` on Manager — mirrors `Dir`'s descent but walks `segs[:len-1]` as dirs then asserts `kopiafs.File` on the final segment; `f.Open(ctx)` returns `kopiafs.Reader` which satisfies `io.ReadSeekCloser` directly (embeds ReadCloser + Seeker); added `ErrNotFound` + `ErrNotAFile` sentinels. Handler: `GET /repo/{ns}/snap/{id}/download/{path...}` → `handleDownload` (reuses `cleanBrowsePath` for traversal guard, empty-path → 400, ErrNotFound/ErrNotAFile → 404, else 500); `http.ServeContent` handles Content-Type sniff, Content-Length, Last-Modified, Range requests; `Content-Disposition: attachment; filename=...` set before. `handleBrowse` now computes `DownloadBase` (same logic as `BrowseBase` but `/download`). UI: `browse.html` file rows now have `<a href="{{$.DownloadBase}}/{{urlPathEscape .Name}}">` (plain href, no htmx); `.entry-file a` hover style in app.css. Tests: `nopReadSeekCloser` in fake, `files` map keyed `"{snapID}|{path}"`, httptest cases (success root file, success subdir file, 400 empty path, 404 missing, 500 error, browse link presence); integration `TestOpenFileLive` (Dir → find file entry → OpenFile → ReadAll → assert len == Size); e2e `TestE2EDownloadLink` (chromedp AttributeValue `.entry-file a href` contains `/download/`).
+- **Verified:** `go test ./...` ✅, `make e2e` ✅. Live integration + checksum vs kopia-restore pending live run.
+- **Key decision:** `http.ServeContent` over `io.Copy` — free Range/If-Modified-Since/Content-Type sniff for zero extra code since `kopiafs.Reader` already satisfies `io.ReadSeeker`.
+- **Next:** **M4** — download folder (tar): `TarDir(ctx, ns, snapID, path)` streaming tar on the fly; same `/download/{path...}` route serves tar when path is a directory; `Content-Type: application/x-tar`.
+- **Blockers:** none.
+
 > Append a short entry at the end of every working session so the next session resumes cleanly.
 > Newest at top. Format: date — what was done / what's next / blockers.
 

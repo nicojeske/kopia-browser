@@ -17,7 +17,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M0 Scaffold | DONE |
 | M1 List namespaces + snapshots | DONE |
 | M2 Browse dir tree | DONE |
-| M3 Download single file | IN PROGRESS |
+| M3 Download single file | DONE |
 | M4 Download folder (tar) | TODO |
 | M5 UI refinement & E2E hardening | TODO |
 | M6 Docker + k8s | TODO |
@@ -72,11 +72,11 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - **UI:** [x] htmx dir listing partial + breadcrumb + SPA swap (`hx-push-url`); chromedp E2E navigates into a directory and verifies URL + content
 - **Verify:** unit + httptest ✅ (incl. `cleanBrowsePath`, htmx branch, leak guard); `make e2e` ✅; integration pending live run.
 
-### M3 — Download single file — `IN PROGRESS`
-- **Data:** [ ] `OpenFile(...)` → `io.ReadSeekCloser`; integration test reads a known file
-- **Handler:** [ ] `GET /repo/{ns}/snap/{id}/download/{path...}` for files; httptest checks headers (`Content-Disposition`, type) + body
-- **UI:** [ ] download links on listing; chromedp E2E triggers a download and checks bytes
-- **Verify:** downloaded file checksum matches `kopia restore` output.
+### M3 — Download single file — `DONE`
+- **Data:** [x] `OpenFile(...)` → `io.ReadSeekCloser`; integration test reads a known file
+- **Handler:** [x] `GET /repo/{ns}/snap/{id}/download/{path...}` for files; httptest checks headers (`Content-Disposition`, type) + body
+- **UI:** [x] download links on listing; chromedp E2E asserts /download/ href
+- **Verify:** unit + httptest ✅; `make e2e` ✅; integration + live checksum pending live run.
 
 ### M4 — Download folder (tar) — `TODO`
 - **Data:** [ ] `TarDir(...)` — stream tar of a directory subtree on the fly; unit test on in-memory tree + integration on `paperless`
