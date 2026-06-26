@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+*.env
+!.env.example
+
+# Build output
+/kopia-browser
+/kopia-browser.exe
+/bin/
+/dist/
+
+# Go
+*.test
+*.out
+coverage.*
+
+# kopia cache / runtime
+/cache/
+*.config
+*.config.update-info.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
