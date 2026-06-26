@@ -63,6 +63,35 @@ UI: server-rendered `html/template`; htmx swaps directory listings without full 
 - File: open object reader, set `Content-Disposition`/`Content-Type`, `io.Copy` to response.
 - Directory: set tar headers, walk subtree, write tar entries streaming (no temp disk).
 
+## Layering (strict)
+
+UI is a separately-testable layer on top of a pure data layer:
+
+```
+web/templates (htmx)  ── rendered by ──>  internal/web (handlers)  ── calls ──>  internal/kopia (data)
+   browser E2E                               httptest                              unit + integration
+```
+
+- `internal/kopia` has no knowledge of HTTP or HTML — it returns Go values. This lets handlers be
+  tested against a fake data layer (define an interface the handlers depend on; real RepoManager +
+  a test fake both implement it).
+- `internal/web` handlers translate data ⇄ templates only.
+- `web/templates` hold all markup; verified by real-browser E2E.
+
+## Testing
+
+| Layer | Tool | Command | Notes |
+|-------|------|---------|-------|
+| Data ops | Go unit | `make test` | pure logic, no I/O |
+| Data ops | Go integration | `make test-integration` (`-tags=integration`) | real garage; skips without creds |
+| Handlers | Go `httptest` | `make test` | assert status + HTML against a fake data layer |
+| UI end-to-end | `chromedp` (headless Chrome) | `make e2e` (build tag `e2e`) | boots server on random port, drives real browser; committed + CI-runnable |
+| Visual / ad-hoc | kapture MCP | (Claude, dev only) | screenshots + interactive poke of the live app; needs Chrome extension + open tab |
+
+E2E harness lives in `internal/web` (or `internal/e2e`): a helper boots the full server on a random
+port against a chosen data layer (real garage or fake), returns the base URL, then `chromedp`
+navigates it. Keep E2E behind a build tag so `make test` stays fast and offline.
+
 ## Notes / constraints
 - Velero `source.path` is an ugly host-pod path; UI shows `tags` + `startTime` instead. See [KOPIA.md](KOPIA.md).
 - Concurrency: RepoManager methods must be safe for concurrent requests.

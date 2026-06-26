@@ -19,10 +19,23 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M2 Browse dir tree | TODO |
 | M3 Download single file | TODO |
 | M4 Download folder (tar) | TODO |
-| M5 UI polish | TODO |
+| M5 UI refinement & E2E hardening | TODO |
 | M6 Docker + k8s | TODO |
 
 Statuses: `TODO` → `IN PROGRESS` → `DONE`.
+
+## Layering & testing model
+
+Every feature is built as three thin layers, each with its own test type. This keeps the UI a
+separately-testable layer rather than an afterthought.
+
+| Layer | Package | Responsibility | Test type |
+|-------|---------|----------------|-----------|
+| Data | `internal/kopia` | pure kopia ops, no HTTP/HTML | Go unit + integration (real garage, `-tags=integration`) |
+| Handler | `internal/web` | call data layer, render templates | Go `httptest` (assert status + HTML) |
+| UI | `web/templates` | htmx pages, interactions, downloads | browser E2E via `chromedp` (headless, `make e2e`) + kapture MCP ad-hoc |
+
+A feature isn't `DONE` until all three layers exist and their tests pass.
 
 ## Milestones
 
@@ -38,33 +51,44 @@ Statuses: `TODO` → `IN PROGRESS` → `DONE`.
 - **Verify:** ✅ build/vet/test green; server serves `/healthz`→`ok` and `/`→hello (200), `/{$}` 404s non-root; missing-required vars fail fast naming each.
 
 ### M1 — List namespaces + snapshots — `TODO`
-- [ ] `internal/kopia` RepoManager: `ListNamespaces()` (list S3 blobs under `KOPIA_PREFIX`, derive first path segment)
-- [ ] RepoManager `Open(ns)` — connect + open repo once per namespace, cached, read-only
-- [ ] `ListSnapshots(ns)` via `snapshot.ListSnapshots`
-- [ ] `GET /` → namespace list page
-- [ ] `GET /repo/{ns}` → snapshot table (show `tags.backup`, `startTime`, size, file count; hide raw source path)
-- [ ] Integration test vs real garage: `paperless` present; snapshots non-empty
-- **Verify:** integration test green; pages render in browser.
+- **Data:** `internal/kopia` RepoManager
+  - [ ] `ListNamespaces()` — list S3 blobs under `KOPIA_PREFIX`, derive first path segment
+  - [ ] `Open(ns)` — connect + open repo once per namespace, cached, read-only
+  - [ ] `ListSnapshots(ns)` via `snapshot.ListSnapshots`
+  - [ ] Integration test vs real garage: `paperless` present; snapshots non-empty
+- **Handler:**
+  - [ ] `GET /` → namespace list page
+  - [ ] `GET /repo/{ns}` → snapshot table (show `tags.backup`, `startTime`, size, file count; hide raw source path)
+  - [ ] `httptest` tests assert status + expected HTML (table-driven, with a fake/mock data layer)
+- **UI + test harness:**
+  - [ ] htmx page templates for both routes
+  - [ ] E2E harness: `internal/web` test helper that boots the server on a random port; `make e2e` target running `chromedp` (build tag `e2e`)
+  - [ ] First `chromedp` E2E: load `/`, click a namespace, see snapshot table
+- **Verify:** unit + integration + httptest + `make e2e` all green.
 
 ### M2 — Browse dir tree — `TODO`
-- [ ] `Dir(ns, snapID, path)` — walk `fs.Directory` from `rootEntry.obj`
-- [ ] `GET /repo/{ns}/snap/{id}/browse/{path...}` — htmx dir listing + breadcrumb
-- **Verify:** browse paperless snapshot in browser.
+- **Data:** [ ] `Dir(ns, snapID, path)` — walk `fs.Directory` from `rootEntry.obj`; unit/integration test on `paperless`
+- **Handler:** [ ] `GET /repo/{ns}/snap/{id}/browse/{path...}`; httptest for listing + breadcrumb + path-escaping
+- **UI:** [ ] htmx dir listing partial + breadcrumb; chromedp E2E navigates into a directory and back
+- **Verify:** all test layers green; browse paperless in browser.
 
 ### M3 — Download single file — `TODO`
-- [ ] `OpenFile(...)` → `io.ReadSeekCloser`; stream with correct headers
-- [ ] `GET /repo/{ns}/snap/{id}/download/{path...}` for files
+- **Data:** [ ] `OpenFile(...)` → `io.ReadSeekCloser`; integration test reads a known file
+- **Handler:** [ ] `GET /repo/{ns}/snap/{id}/download/{path...}` for files; httptest checks headers (`Content-Disposition`, type) + body
+- **UI:** [ ] download links on listing; chromedp E2E triggers a download and checks bytes
 - **Verify:** downloaded file checksum matches `kopia restore` output.
 
 ### M4 — Download folder (tar) — `TODO`
-- [ ] `TarDir(...)` — stream tar of a directory subtree on the fly
-- [ ] Same download route serves tar when target is a directory
+- **Data:** [ ] `TarDir(...)` — stream tar of a directory subtree on the fly; unit test on in-memory tree + integration on `paperless`
+- **Handler:** [ ] same download route serves tar when target is a directory; httptest validates tar stream
+- **UI:** [ ] "download folder" affordance; chromedp E2E downloads + extracts a folder
 - **Verify:** tar extracts; contents match.
 
-### M5 — UI polish — `TODO`
-- [ ] Snapshot metadata, human sizes, sorting, breadcrumbs, error pages
-- [ ] Static assets (htmx, minimal css)
-- **Verify:** manual pass over all flows.
+### M5 — UI refinement & E2E hardening — `TODO`
+- [ ] Snapshot metadata, human sizes, sorting, error pages, empty states
+- [ ] Static assets finalized (htmx, minimal css)
+- [ ] Broaden chromedp E2E to cover full happy path + key error paths; kapture visual pass + screenshots
+- **Verify:** full E2E suite green; manual visual pass.
 
 ### M6 — Docker + k8s — `TODO`
 - [ ] Multi-stage `Dockerfile` (distroless/scratch)
