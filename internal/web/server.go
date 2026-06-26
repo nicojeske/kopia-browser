@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,6 +36,16 @@ type Backups interface {
 	// TarDir streams a plain tar archive of the directory subtree rooted at path
 	// (empty = snapshot root) into w.
 	TarDir(ctx context.Context, ns, snapID, path string, w io.Writer) error
+}
+
+// VolumeInfo summarises one Velero PVC volume within a namespace.
+// Name is the raw volume tag value ("" for snapshots that carry no volume tag).
+// Display is the human-readable label: "(no volume)" when Name is empty.
+type VolumeInfo struct {
+	Name    string    // raw Tags["volume"] value; "" for untagged snapshots
+	Display string    // shown in UI; "(no volume)" when Name == ""
+	Count   int       // total snapshots for this volume
+	Latest  time.Time // start time of the newest snapshot
 }
 
 // crumb is one level of the directory breadcrumb.
@@ -63,7 +74,8 @@ func NewServer(cfg *config.Config, backups Backups, templates, static fs.FS) (ht
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
-	mux.HandleFunc("GET /repo/{ns}", s.handleSnapshots)
+	mux.HandleFunc("GET /repo/{ns}", s.handleVolumes)
+	mux.HandleFunc("GET /repo/{ns}/vol/{volume...}", s.handleSnapshots)
 	mux.HandleFunc("GET /repo/{ns}/snap/{id}/browse/{path...}", s.handleBrowse)
 	mux.HandleFunc("GET /repo/{ns}/snap/{id}/download/{path...}", s.handleDownload)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
@@ -85,15 +97,92 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "namespaces.html", map[string]any{"Title": "Namespaces", "Namespaces": namespaces})
 }
 
-// handleSnapshots lists the snapshots of one namespace.
-func (s *server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
+// handleVolumes lists the distinct Velero volumes (PVCs) within a namespace.
+// Each volume is derived from the "volume" tag on the kopia snapshot manifests.
+// Snapshots that carry no volume tag are grouped under "(no volume)".
+func (s *server) handleVolumes(w http.ResponseWriter, r *http.Request) {
 	ns := r.PathValue("ns")
-	snaps, err := s.backups.ListSnapshots(r.Context(), ns)
+	allSnaps, err := s.backups.ListSnapshots(r.Context(), ns)
 	if err != nil {
 		s.renderError(w, http.StatusInternalServerError, "listing snapshots", err)
 		return
 	}
-	s.render(w, "snapshots.html", map[string]any{"Title": ns, "Namespace": ns, "Snapshots": snaps})
+
+	// Bucket snapshots by volume name, preserving newest-first insertion order.
+	type bucket struct {
+		count  int
+		latest time.Time
+	}
+	byVol := map[string]*bucket{}
+	var order []string
+	for _, snap := range allSnaps {
+		vol := snap.Volume
+		if _, seen := byVol[vol]; !seen {
+			order = append(order, vol)
+			byVol[vol] = &bucket{}
+		}
+		b := byVol[vol]
+		b.count++
+		if snap.StartTime.After(b.latest) {
+			b.latest = snap.StartTime
+		}
+	}
+
+	// Sort alphabetically; untagged ("") goes last.
+	sort.Slice(order, func(i, j int) bool {
+		if order[i] == "" {
+			return false
+		}
+		if order[j] == "" {
+			return true
+		}
+		return order[i] < order[j]
+	})
+
+	vols := make([]VolumeInfo, 0, len(order))
+	for _, name := range order {
+		b := byVol[name]
+		display := name
+		if display == "" {
+			display = "(no volume)"
+		}
+		vols = append(vols, VolumeInfo{Name: name, Display: display, Count: b.count, Latest: b.latest})
+	}
+
+	s.render(w, "volumes.html", map[string]any{"Title": ns, "Namespace": ns, "Volumes": vols})
+}
+
+// handleSnapshots lists the snapshots for a specific volume within a namespace.
+// The {volume...} wildcard is the raw Tags["volume"] value; empty = untagged snapshots.
+func (s *server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
+	ns := r.PathValue("ns")
+	volume := r.PathValue("volume")
+
+	allSnaps, err := s.backups.ListSnapshots(r.Context(), ns)
+	if err != nil {
+		s.renderError(w, http.StatusInternalServerError, "listing snapshots", err)
+		return
+	}
+
+	// Filter to the requested volume tag value (empty = untagged snapshots).
+	var snaps []kopia.SnapshotInfo
+	for _, snap := range allSnaps {
+		if snap.Volume == volume {
+			snaps = append(snaps, snap)
+		}
+	}
+
+	display := volume
+	if display == "" {
+		display = "(no volume)"
+	}
+	s.render(w, "snapshots.html", map[string]any{
+		"Title":     ns + " / " + display,
+		"Namespace": ns,
+		"Volume":    volume,
+		"Display":   display,
+		"Snapshots": snaps,
+	})
 }
 
 // handleBrowse renders the directory listing for a path inside a snapshot.

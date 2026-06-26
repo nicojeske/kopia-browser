@@ -85,6 +85,7 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - **Verify:** `go test ./...` ✅; `make e2e` ✅; integration + live manual pending live run.
 
 ### M5 — UI refinement & E2E hardening — `TODO`
+- [x] Volume navigation layer: `/repo/{ns}` lists volumes; `/repo/{ns}/vol/{volume...}` lists snapshots for that volume. Grouping handler-side from existing `ListSnapshots`. Untagged snapshots → "(no volume)".
 - [ ] Snapshot metadata, human sizes, sorting, error pages, empty states
 - [ ] Static assets finalized (htmx, minimal css)
 - [ ] Broaden chromedp E2E to cover full happy path + key error paths; kapture visual pass + screenshots

@@ -68,8 +68,8 @@ func TestListSnapshotsLive(t *testing.T) {
 	}
 
 	s := snaps[0]
-	t.Logf("newest snapshot: id=%s backup=%q start=%s size=%d files=%d tags=%v",
-		s.ID, s.BackupName, s.StartTime, s.TotalSize, s.FileCount, s.Tags)
+	t.Logf("newest snapshot: id=%s backup=%q volume=%q start=%s size=%d files=%d tags=%v",
+		s.ID, s.BackupName, s.Volume, s.StartTime, s.TotalSize, s.FileCount, s.Tags)
 
 	if s.ID == "" {
 		t.Error("snapshot ID is empty")
@@ -77,6 +77,13 @@ func TestListSnapshotsLive(t *testing.T) {
 	if s.StartTime.IsZero() {
 		t.Error("snapshot StartTime is zero")
 	}
+
+	// Log distinct volumes — the volume layer groups by this field.
+	volSet := map[string]int{}
+	for _, sn := range snaps {
+		volSet[sn.Volume]++
+	}
+	t.Logf("distinct volumes in paperless (%d snapshots): %v", len(snaps), volSet)
 }
 
 func TestDirLive(t *testing.T) {

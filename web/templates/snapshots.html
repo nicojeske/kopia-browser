@@ -1,6 +1,6 @@
 {{template "head" .}}
-<nav class="breadcrumb"><a href="/">Namespaces</a> / {{.Namespace}}</nav>
-<h1>{{.Namespace}} — snapshots</h1>
+<nav class="breadcrumb"><a href="/">Namespaces</a> / <a href="/repo/{{.Namespace}}">{{.Namespace}}</a> / {{.Display}}</nav>
+<h1>{{.Namespace}} / {{.Display}} — snapshots</h1>
 {{if .Snapshots}}
 <table class="snapshots">
   <thead>
@@ -18,6 +18,6 @@
   </tbody>
 </table>
 {{else}}
-<p class="empty">No snapshots in this namespace.</p>
+<p class="empty">No snapshots for this volume.</p>
 {{end}}
 {{template "foot" .}}

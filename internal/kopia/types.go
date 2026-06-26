@@ -13,6 +13,7 @@ import "time"
 type SnapshotInfo struct {
 	ID         string            // snapshot manifest id
 	BackupName string            // Tags["backup"], the friendly Velero backup name
+	Volume     string            // Tags["volume"], the Velero PVC volume name (empty if unset)
 	StartTime  time.Time         // snapshot start
 	EndTime    time.Time         // snapshot end
 	TotalSize  int64             // total file bytes (Stats.TotalFileSize)

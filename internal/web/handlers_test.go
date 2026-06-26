@@ -32,14 +32,26 @@ func sampleData() fakeBackups {
 	return fakeBackups{
 		namespaces: []string{"paperless", "gitea"},
 		snapshots: map[string][]kopia.SnapshotInfo{
-			"paperless": {{
-				ID:         "snap-1",
-				BackupName: "velero-daily-20260626",
-				StartTime:  time.Date(2026, 6, 26, 1, 2, 3, 0, time.UTC),
-				TotalSize:  3 * 1024 * 1024,
-				FileCount:  42,
-				Tags:       map[string]string{"backup": "velero-daily-20260626", "path": uglySourcePath},
-			}},
+			"paperless": {
+				{
+					ID:         "snap-1",
+					BackupName: "velero-daily-20260626",
+					Volume:     "data-pvc",
+					StartTime:  time.Date(2026, 6, 26, 1, 2, 3, 0, time.UTC),
+					TotalSize:  3 * 1024 * 1024,
+					FileCount:  42,
+					Tags:       map[string]string{"backup": "velero-daily-20260626", "volume": "data-pvc", "path": uglySourcePath},
+				},
+				{
+					ID:         "snap-2",
+					BackupName: "velero-daily-20260625",
+					Volume:     "config-pvc",
+					StartTime:  time.Date(2026, 6, 25, 1, 2, 3, 0, time.UTC),
+					TotalSize:  1 * 1024 * 1024,
+					FileCount:  10,
+					Tags:       map[string]string{"backup": "velero-daily-20260625", "volume": "config-pvc", "path": uglySourcePath},
+				},
+			},
 		},
 		dirs: map[string][]kopia.DirEntry{
 			"snap-1|": {
@@ -78,8 +90,16 @@ func TestHandlers(t *testing.T) {
 			wantContain: []string{`href="/repo/paperless"`, `href="/repo/gitea"`, "Namespaces"},
 		},
 		{
-			name:       "snapshot table shows backup, human size, no source path",
-			target:     "/repo/paperless",
+			name:        "volumes page lists volume names, no source path",
+			target:      "/repo/paperless",
+			backups:     sampleData(),
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"config-pvc", "data-pvc", "Namespaces"},
+			wantAbsent:  []string{uglySourcePath, "host_pods"},
+		},
+		{
+			name:       "snapshot list for a volume shows its backups",
+			target:     "/repo/paperless/vol/data-pvc",
 			backups:    sampleData(),
 			wantStatus: http.StatusOK,
 			wantContain: []string{
@@ -87,8 +107,9 @@ func TestHandlers(t *testing.T) {
 				"2026-06-26 01:02:03",
 				"3.0 MiB",
 				"42",
+				"data-pvc", // volume displayed in heading/breadcrumb
 			},
-			wantAbsent: []string{uglySourcePath, "host_pods"},
+			wantAbsent: []string{uglySourcePath, "host_pods", "velero-daily-20260625"},
 		},
 		{
 			name:        "empty namespace renders empty state",

@@ -47,7 +47,8 @@ Routes:
 | Method+Path | Purpose |
 |-------------|---------|
 | `GET /` | namespace list |
-| `GET /repo/{ns}` | snapshot table for namespace |
+| `GET /repo/{ns}` | volume list for namespace (grouped by Velero `volume` tag) |
+| `GET /repo/{ns}/vol/{volume...}` | snapshot table for one volume (`volume` = raw tag value; empty = untagged) |
 | `GET /repo/{ns}/snap/{id}/browse/{path...}` | directory listing (htmx partial + breadcrumb) |
 | `GET /repo/{ns}/snap/{id}/download/{path...}` | stream file, or tar if path is a directory |
 | `GET /healthz` | liveness |

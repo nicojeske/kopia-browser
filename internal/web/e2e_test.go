@@ -14,9 +14,45 @@ import (
 
 // E2E drives the real UI in headless Chrome against the fake data layer, so it
 // is deterministic and needs no S3. Run: make e2e (requires Chrome/Chromium).
-//
-// It boots the full server on a random port, loads the namespace page, clicks a
-// namespace, and asserts the snapshot table renders the expected backup.
+
+// TestE2ENamespaceToVolumes checks that clicking a namespace shows the volume list.
+func TestE2ENamespaceToVolumes(t *testing.T) {
+	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	defer srv.Close()
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.NoSandbox,
+	)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAlloc()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+	ctx, cancelTimeout := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelTimeout()
+
+	var tableText string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(srv.URL+"/"),
+		chromedp.WaitVisible(`a[href="/repo/paperless"]`, chromedp.ByQuery),
+		chromedp.Click(`a[href="/repo/paperless"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.volumes`, chromedp.ByQuery),
+		chromedp.Text(`table.volumes`, &tableText, chromedp.ByQuery),
+	)
+	if err != nil {
+		if isNoBrowser(err) {
+			t.Skipf("no Chrome/Chromium available for E2E: %v", err)
+		}
+		t.Fatalf("chromedp run: %v", err)
+	}
+
+	if !strings.Contains(tableText, "data-pvc") {
+		t.Errorf("volumes table missing expected volume name; got:\n%s", tableText)
+	}
+}
+
+// TestE2ENamespaceToSnapshots navigates namespace → volume → snapshot list.
 func TestE2ENamespaceToSnapshots(t *testing.T) {
 	srv := httptest.NewServer(newTestServer(t, sampleData()))
 	defer srv.Close()
@@ -38,6 +74,8 @@ func TestE2ENamespaceToSnapshots(t *testing.T) {
 		chromedp.Navigate(srv.URL+"/"),
 		chromedp.WaitVisible(`a[href="/repo/paperless"]`, chromedp.ByQuery),
 		chromedp.Click(`a[href="/repo/paperless"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.volumes`, chromedp.ByQuery),
+		chromedp.Click(`table.volumes a[href*="/vol/data-pvc"]`, chromedp.ByQuery),
 		chromedp.WaitVisible(`table.snapshots`, chromedp.ByQuery),
 		chromedp.Text(`table.snapshots`, &tableText, chromedp.ByQuery),
 	)
@@ -72,10 +110,12 @@ func TestE2EBrowseDir(t *testing.T) {
 
 	var listingText, subText, urlAfterNav string
 	err := chromedp.Run(ctx,
-		// Navigate to namespace → snapshots.
+		// Navigate to namespace → volumes → snapshots.
 		chromedp.Navigate(srv.URL+"/"),
 		chromedp.WaitVisible(`a[href="/repo/paperless"]`, chromedp.ByQuery),
 		chromedp.Click(`a[href="/repo/paperless"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.volumes`, chromedp.ByQuery),
+		chromedp.Click(`table.volumes a[href*="/vol/data-pvc"]`, chromedp.ByQuery),
 		chromedp.WaitVisible(`table.snapshots`, chromedp.ByQuery),
 
 		// Click the snapshot browse link → root dir listing.

@@ -109,6 +109,7 @@ func (m *Manager) ListSnapshots(ctx context.Context, ns string) ([]SnapshotInfo,
 		out = append(out, SnapshotInfo{
 			ID:         string(man.ID),
 			BackupName: man.Tags["backup"],
+			Volume:     man.Tags["volume"],
 			StartTime:  man.StartTime.ToTime(),
 			EndTime:    man.EndTime.ToTime(),
 			TotalSize:  man.Stats.TotalFileSize,

@@ -1,0 +1,22 @@
+{{template "head" .}}
+<nav class="breadcrumb"><a href="/">Namespaces</a> / {{.Namespace}}</nav>
+<h1>{{.Namespace}} — volumes</h1>
+{{if .Volumes}}
+<table class="volumes">
+  <thead>
+    <tr><th>Volume</th><th>Snapshots</th><th>Latest backup</th></tr>
+  </thead>
+  <tbody>
+  {{range .Volumes}}
+    <tr>
+      <td><a href="/repo/{{$.Namespace}}/vol/{{urlPathEscape .Name}}">{{.Display}}</a></td>
+      <td>{{.Count}}</td>
+      <td>{{humanTime .Latest}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No snapshots in this namespace.</p>
+{{end}}
+{{template "foot" .}}

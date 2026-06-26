@@ -25,13 +25,14 @@ a { color: LinkText; }
   text-decoration: none;
 }
 .namespaces a:hover { background: color-mix(in srgb, CanvasText 8%, transparent); }
-table.snapshots { width: 100%; border-collapse: collapse; }
-table.snapshots th, table.snapshots td {
+table.snapshots, table.volumes { width: 100%; border-collapse: collapse; }
+table.snapshots th, table.snapshots td,
+table.volumes th, table.volumes td {
   text-align: left;
   padding: .5rem .75rem;
   border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
 }
-table.snapshots th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+table.snapshots th, table.volumes th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
 table.entries { width: 100%; border-collapse: collapse; }
 table.entries th, table.entries td {
   text-align: left;

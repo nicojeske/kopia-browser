@@ -2,6 +2,13 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-06-26 — Volume navigation layer
+
+- **Handler-side grouping, no new data method.** `ListSnapshots` already returns the full flat list with `SnapshotInfo.Volume` (derived from `Tags["volume"]`). `handleVolumes` groups the slice by volume in-process; `handleSnapshots` filters it. No new `Backups` interface method, no fake churn.
+- **`{volume...}` wildcard route** (`/repo/{ns}/vol/{volume...}`). The wildcard can be empty, so `/repo/ns/vol/` routes to volume="" (snapshots missing the volume tag). Named volumes are single path segments (Velero uses DNS-valid PVC names, no slashes).
+- **"(no volume)" sentinel display only, never in URLs.** Snapshots with `Tags["volume"]==""` are shown under "(no volume)" in the UI but linked to `/repo/{ns}/vol/` (empty tail), not to a URL containing the literal string "(no volume)". Keeps URLs clean and avoids double-decode issues.
+- **Alphabetical sort, empty name last.** Volumes sorted alphabetically; untagged ("") bucket comes last since it is the exception rather than the rule.
+
 ## 2026-06-26 — M4 folder tar download
 - **Same `/download/{path...}` route for both files and directories.** No extra route, no query param. The handler calls `OpenFile` first; `ErrNotAFile` returned for any directory (incl. empty path = snapshot root) triggers the tar branch. Clean branching on sentinel errors; no extra round trip.
 - **`io.Writer` signature for `TarDir` (not `io.Pipe`).** Handler sets headers, then calls `TarDir(ctx, ns, snapID, path, w)`. Backpressure is trivial (handler blocks on write), no goroutine needed. Content-Length is unknown so chunked transfer encoding is used automatically by Go's `http.ResponseWriter`.
