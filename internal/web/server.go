@@ -6,8 +6,10 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -25,6 +27,9 @@ type Backups interface {
 	ListNamespaces(ctx context.Context) ([]string, error)
 	ListSnapshots(ctx context.Context, ns string) ([]kopia.SnapshotInfo, error)
 	Dir(ctx context.Context, ns, snapID, path string) ([]kopia.DirEntry, error)
+	// OpenFile returns a seekable stream for a single file within a snapshot
+	// plus its metadata. Caller must Close the reader.
+	OpenFile(ctx context.Context, ns, snapID, path string) (io.ReadSeekCloser, kopia.DirEntry, error)
 }
 
 // crumb is one level of the directory breadcrumb.
@@ -55,6 +60,7 @@ func NewServer(cfg *config.Config, backups Backups, templates, static fs.FS) (ht
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("GET /repo/{ns}", s.handleSnapshots)
 	mux.HandleFunc("GET /repo/{ns}/snap/{id}/browse/{path...}", s.handleBrowse)
+	mux.HandleFunc("GET /repo/{ns}/snap/{id}/download/{path...}", s.handleDownload)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
 	return mux, nil
 }
@@ -111,6 +117,12 @@ func (s *server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		browseBase += "/" + cleanPath
 	}
 
+	// DownloadBase is the URL prefix used by file-entry download links.
+	downloadBase := fmt.Sprintf("/repo/%s/snap/%s/download", ns, snapID)
+	if cleanPath != "" {
+		downloadBase += "/" + cleanPath
+	}
+
 	// Build breadcrumb: Namespaces → ns → snap → seg1 → seg2 …
 	snapDisplay := snapID
 	if len(snapDisplay) > 8 {
@@ -144,13 +156,14 @@ func (s *server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		title += " / " + cleanPath
 	}
 	data := map[string]any{
-		"Title":      title,
-		"Namespace":  ns,
-		"SnapID":     snapID,
-		"Path":       cleanPath,
-		"Crumbs":     crumbs,
-		"Entries":    entries,
-		"BrowseBase": browseBase,
+		"Title":        title,
+		"Namespace":    ns,
+		"SnapID":       snapID,
+		"Path":         cleanPath,
+		"Crumbs":       crumbs,
+		"Entries":      entries,
+		"BrowseBase":   browseBase,
+		"DownloadBase": downloadBase,
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
@@ -161,6 +174,42 @@ func (s *server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "browse.html", data)
+}
+
+// handleDownload streams a single file from a snapshot to the browser.
+// It uses http.ServeContent so the response includes Content-Type (sniffed
+// from extension/content), Content-Length, Last-Modified and Range support.
+func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
+	ns := r.PathValue("ns")
+	snapID := r.PathValue("id")
+	rawPath := r.PathValue("path")
+
+	cleanPath, _, err := cleanBrowsePath(rawPath)
+	if err != nil {
+		s.renderError(w, http.StatusBadRequest, "invalid path", err)
+		return
+	}
+	if cleanPath == "" {
+		s.renderError(w, http.StatusBadRequest, "invalid path", fmt.Errorf("path is required"))
+		return
+	}
+
+	rc, entry, err := s.backups.OpenFile(r.Context(), ns, snapID, cleanPath)
+	if err != nil {
+		if errors.Is(err, kopia.ErrNotFound) || errors.Is(err, kopia.ErrNotAFile) {
+			s.renderError(w, http.StatusNotFound, "not found", err)
+			return
+		}
+		s.renderError(w, http.StatusInternalServerError, "opening file", err)
+		return
+	}
+	defer rc.Close()
+
+	// Content-Disposition forces a browser download with the original filename.
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, entry.Name))
+	// ServeContent handles Content-Type (extension sniff), Content-Length,
+	// Last-Modified and Range requests automatically.
+	http.ServeContent(w, r, entry.Name, entry.ModTime, rc)
 }
 
 // cleanBrowsePath normalises a user-supplied path value from the URL.

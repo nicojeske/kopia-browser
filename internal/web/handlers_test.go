@@ -52,6 +52,10 @@ func sampleData() fakeBackups {
 				{Name: "export.csv", IsDir: false, Size: 512 * 1024, ModTime: now},
 			},
 		},
+		files: map[string][]byte{
+			"snap-1|config.yaml":      []byte("key: value\n"),
+			"snap-1|data/export.csv":  []byte("col1,col2\n1,2\n"),
+		},
 	}
 }
 
@@ -64,6 +68,7 @@ func TestHandlers(t *testing.T) {
 		wantStatus  int
 		wantContain []string
 		wantAbsent  []string
+		wantHeader  map[string]string // response header key → substring of expected value
 	}{
 		{
 			name:        "index lists namespaces",
@@ -147,6 +152,59 @@ func TestHandlers(t *testing.T) {
 			wantStatus: http.StatusInternalServerError,
 			wantContain: []string{"repo down"},
 		},
+		{
+			name:       "browse root listing has download link for files",
+			target:     "/repo/paperless/snap/snap-1/browse/",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantContain: []string{
+				"/download/config.yaml", // file download link in root listing
+			},
+		},
+		{
+			name:       "browse subdir listing has download link for files",
+			target:     "/repo/paperless/snap/snap-1/browse/data",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantContain: []string{
+				"/download/data/export.csv", // file download link in data/ listing
+			},
+		},
+		{
+			name:       "download file success",
+			target:     "/repo/paperless/snap/snap-1/download/config.yaml",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantContain: []string{"key: value"},
+			wantHeader:  map[string]string{"Content-Disposition": "config.yaml"},
+		},
+		{
+			name:       "download subdir file success",
+			target:     "/repo/paperless/snap/snap-1/download/data/export.csv",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantContain: []string{"col1,col2"},
+			wantHeader:  map[string]string{"Content-Disposition": "export.csv"},
+		},
+		{
+			name:       "download empty path rejected",
+			target:     "/repo/paperless/snap/snap-1/download/",
+			backups:    sampleData(),
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "download missing file yields 404",
+			target:     "/repo/paperless/snap/snap-1/download/data/missing.txt",
+			backups:    sampleData(),
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "download data error yields 500",
+			target:     "/repo/paperless/snap/snap-1/download/config.yaml",
+			backups:    fakeBackups{err: errors.New("storage down")},
+			wantStatus: http.StatusInternalServerError,
+			wantContain: []string{"storage down"},
+		},
 	}
 
 	for _, tc := range tests {
@@ -171,6 +229,12 @@ func TestHandlers(t *testing.T) {
 			for _, absent := range tc.wantAbsent {
 				if strings.Contains(body, absent) {
 					t.Errorf("body unexpectedly contains %q", absent)
+				}
+			}
+			for k, v := range tc.wantHeader {
+				got := rec.Header().Get(k)
+				if !strings.Contains(got, v) {
+					t.Errorf("header %q = %q, want to contain %q", k, got, v)
 				}
 			}
 		})

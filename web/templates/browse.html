@@ -19,7 +19,7 @@
         <td class="entry-dir"><a href="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-get="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-target="#listing" hx-push-url="true">{{.Name}}/</a></td>
         <td>—</td>
       {{else}}
-        <td class="entry-file">{{.Name}}</td>
+        <td class="entry-file"><a href="{{$.DownloadBase}}/{{urlPathEscape .Name}}">{{.Name}}</a></td>
         <td>{{humanBytes .Size}}</td>
       {{end}}
       <td>{{humanTime .ModTime}}</td>

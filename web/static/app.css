@@ -41,5 +41,7 @@ table.entries th, table.entries td {
 table.entries th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
 .entry-dir a { font-weight: 500; }
 .entry-file { font-family: ui-monospace, monospace; font-size: .9em; }
+.entry-file a { text-decoration: none; }
+.entry-file a:hover { text-decoration: underline; }
 .muted { opacity: .6; font-family: ui-monospace, monospace; font-size: .85em; }
 .empty { opacity: .7; }

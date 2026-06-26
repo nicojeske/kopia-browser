@@ -108,6 +108,44 @@ func TestE2EBrowseDir(t *testing.T) {
 	}
 }
 
+// TestE2EDownloadLink checks that file entries in the browse listing have a
+// download link pointing to the /download/ route (not hx-get driven).
+func TestE2EDownloadLink(t *testing.T) {
+	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	defer srv.Close()
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.NoSandbox,
+	)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAlloc()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+	ctx, cancelTimeout := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelTimeout()
+
+	var linkHref string
+	err := chromedp.Run(ctx,
+		// Navigate to the root browse listing.
+		chromedp.Navigate(srv.URL+"/repo/paperless/snap/snap-1/browse/"),
+		chromedp.WaitVisible(`table.entries`, chromedp.ByQuery),
+		// Get the href of the file download link.
+		chromedp.AttributeValue(`table.entries .entry-file a`, "href", &linkHref, nil, chromedp.ByQuery),
+	)
+	if err != nil {
+		if isNoBrowser(err) {
+			t.Skipf("no Chrome/Chromium available for E2E: %v", err)
+		}
+		t.Fatalf("chromedp run: %v", err)
+	}
+
+	if !strings.Contains(linkHref, "/download/") {
+		t.Errorf("file entry link href = %q, expected to contain /download/", linkHref)
+	}
+}
+
 func isNoBrowser(err error) bool {
 	s := err.Error()
 	return strings.Contains(s, "executable file not found") ||

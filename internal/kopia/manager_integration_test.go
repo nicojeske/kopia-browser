@@ -4,6 +4,7 @@ package kopia_test
 
 import (
 	"context"
+	"io"
 	"os"
 	"testing"
 
@@ -111,6 +112,76 @@ func TestDirLive(t *testing.T) {
 		}
 	}
 	t.Log("no subdirectory found at root")
+}
+
+func TestOpenFileLive(t *testing.T) {
+	mgr, _ := testManager(t)
+	ctx := context.Background()
+
+	snaps, err := mgr.ListSnapshots(ctx, "paperless")
+	if err != nil {
+		t.Fatalf("ListSnapshots: %v", err)
+	}
+	if len(snaps) == 0 {
+		t.Skip("no snapshots in paperless")
+	}
+	snapID := snaps[0].ID
+
+	// Find a file entry at the root (skip dirs).
+	entries, err := mgr.Dir(ctx, "paperless", snapID, "")
+	if err != nil {
+		t.Fatalf("Dir(root): %v", err)
+	}
+	var fileEntry kopia.DirEntry
+	for _, e := range entries {
+		if !e.IsDir {
+			fileEntry = e
+			break
+		}
+	}
+	if fileEntry.Name == "" {
+		// No file at root — descend into the first subdir to find one.
+		for _, e := range entries {
+			if e.IsDir {
+				sub, err := mgr.Dir(ctx, "paperless", snapID, e.Name)
+				if err != nil {
+					t.Fatalf("Dir(%q): %v", e.Name, err)
+				}
+				for _, se := range sub {
+					if !se.IsDir {
+						fileEntry = kopia.DirEntry{Name: e.Name + "/" + se.Name, IsDir: false, Size: se.Size}
+						break
+					}
+				}
+				if fileEntry.Name != "" {
+					break
+				}
+			}
+		}
+	}
+	if fileEntry.Name == "" {
+		t.Skip("no file entry found in paperless snapshot")
+	}
+
+	t.Logf("opening file %q (size %d)", fileEntry.Name, fileEntry.Size)
+	rc, entry, err := mgr.OpenFile(ctx, "paperless", snapID, fileEntry.Name)
+	if err != nil {
+		t.Fatalf("OpenFile(%q): %v", fileEntry.Name, err)
+	}
+	defer rc.Close()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("read all: %v", err)
+	}
+	t.Logf("read %d bytes; entry.Name=%q entry.Size=%d", len(data), entry.Name, entry.Size)
+
+	if len(data) == 0 {
+		t.Error("read zero bytes from file")
+	}
+	if int64(len(data)) != entry.Size {
+		t.Errorf("read %d bytes, expected entry.Size %d", len(data), entry.Size)
+	}
 }
 
 func entryNames(entries []kopia.DirEntry) []string {

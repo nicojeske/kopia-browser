@@ -2,7 +2,9 @@ package kopia
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -226,6 +228,96 @@ func (m *Manager) Dir(ctx context.Context, ns, snapID, path string) ([]DirEntry,
 		})
 	}
 	return out, nil
+}
+
+// ErrNotFound is returned by OpenFile when any segment of the path does not
+// exist in the snapshot.
+var ErrNotFound = errors.New("not found")
+
+// ErrNotAFile is returned by OpenFile when the final path segment resolves to
+// a directory. Use the forthcoming folder-download route (M4) for directories.
+var ErrNotAFile = errors.New("path is a directory, not a file")
+
+// OpenFile opens a single file within a snapshot for reading. path must be a
+// slash-separated path from the snapshot root pointing at a regular file (not
+// a directory, and not the empty root). The caller must Close the returned
+// reader. Returns ErrNotFound when any path segment is absent, ErrNotAFile
+// when the final segment is a directory.
+func (m *Manager) OpenFile(ctx context.Context, ns, snapID, path string) (io.ReadSeekCloser, DirEntry, error) {
+	if path == "" {
+		return nil, DirEntry{}, fmt.Errorf("path is empty: %w", ErrNotAFile)
+	}
+
+	rep, err := m.open(ctx, ns)
+	if err != nil {
+		return nil, DirEntry{}, err
+	}
+
+	man, err := snapshot.LoadSnapshot(ctx, rep, manifest.ID(snapID))
+	if err != nil {
+		return nil, DirEntry{}, fmt.Errorf("load snapshot %q: %w", snapID, err)
+	}
+
+	root, err := snapshotfs.SnapshotRoot(rep, man)
+	if err != nil {
+		return nil, DirEntry{}, fmt.Errorf("snapshot root for %q: %w", snapID, err)
+	}
+
+	dir, ok := root.(kopiafs.Directory)
+	if !ok {
+		return nil, DirEntry{}, fmt.Errorf("snapshot root of %q is not a directory", snapID)
+	}
+
+	segs := strings.Split(path, "/")
+
+	// Descend into every parent directory (all segments except the last).
+	for _, seg := range segs[:len(segs)-1] {
+		child, err := dir.Child(ctx, seg)
+		if err != nil {
+			if errors.Is(err, kopiafs.ErrEntryNotFound) {
+				return nil, DirEntry{}, fmt.Errorf("navigate to %q: %w", seg, ErrNotFound)
+			}
+			return nil, DirEntry{}, fmt.Errorf("navigate to %q: %w", seg, err)
+		}
+		childDir, ok := child.(kopiafs.Directory)
+		if !ok {
+			return nil, DirEntry{}, fmt.Errorf("%q is not a directory: %w", seg, ErrNotFound)
+		}
+		dir = childDir
+	}
+
+	// Resolve the final segment.
+	last := segs[len(segs)-1]
+	child, err := dir.Child(ctx, last)
+	if err != nil {
+		if errors.Is(err, kopiafs.ErrEntryNotFound) {
+			return nil, DirEntry{}, fmt.Errorf("open %q: %w", last, ErrNotFound)
+		}
+		return nil, DirEntry{}, fmt.Errorf("open %q: %w", last, err)
+	}
+
+	// Reject directories — those will be handled by M4's tar route.
+	if child.IsDir() {
+		return nil, DirEntry{}, fmt.Errorf("%q is a directory: %w", last, ErrNotAFile)
+	}
+
+	f, ok := child.(kopiafs.File)
+	if !ok {
+		return nil, DirEntry{}, fmt.Errorf("%q cannot be opened as a file", last)
+	}
+
+	rc, err := f.Open(ctx)
+	if err != nil {
+		return nil, DirEntry{}, fmt.Errorf("open file %q: %w", last, err)
+	}
+
+	entry := DirEntry{
+		Name:    child.Name(),
+		IsDir:   false,
+		Size:    child.Size(),
+		ModTime: child.ModTime(),
+	}
+	return rc, entry, nil
 }
 
 // Close closes every cached repository. Safe to call once at shutdown.
