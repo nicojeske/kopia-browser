@@ -14,7 +14,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 
 | Milestone | Status |
 |-----------|--------|
-| M0 Scaffold | TODO |
+| M0 Scaffold | DONE |
 | M1 List namespaces + snapshots | TODO |
 | M2 Browse dir tree | TODO |
 | M3 Download single file | TODO |
@@ -26,16 +26,16 @@ Statuses: `TODO` → `IN PROGRESS` → `DONE`.
 
 ## Milestones
 
-### M0 — Scaffold — `TODO`
-- [ ] `git init`, `.gitignore` (`.env`, binaries, kopia cache, tmp)
-- [ ] `go.mod` (`github.com/nicojeske/kopia-browser`), Go 1.22+
-- [ ] Directory layout (see [ARCHITECTURE.md](ARCHITECTURE.md))
-- [ ] `internal/config` — load + validate env (and `.env` in dev)
-- [ ] Minimal HTTP server: `/healthz` + a hello template render
-- [ ] `Makefile` (run/test/test-integration/build/docker)
-- [ ] `.env.example` (empty values, committed)
-- [ ] CLAUDE.md + docs committed
-- **Verify:** `make run` serves, `make test` green.
+### M0 — Scaffold — `DONE`
+- [x] `git init`, `.gitignore` (`.env`, binaries, kopia cache, tmp)
+- [x] `go.mod` (`github.com/nicojeske/kopia-browser`), Go 1.26
+- [x] Directory layout (see [ARCHITECTURE.md](ARCHITECTURE.md))
+- [x] `internal/config` — load + validate env (and `.env` in dev); aggregates all missing required vars
+- [x] Minimal HTTP server: `/healthz` + a hello template render (embedded via root `assets` pkg)
+- [x] `Makefile` (run/test/test-integration/build/docker)
+- [x] `.env.example` (empty values, committed)
+- [x] CLAUDE.md + docs committed
+- **Verify:** ✅ build/vet/test green; server serves `/healthz`→`ok` and `/`→hello (200), `/{$}` 404s non-root; missing-required vars fail fast naming each.
 
 ### M1 — List namespaces + snapshots — `TODO`
 - [ ] `internal/kopia` RepoManager: `ListNamespaces()` (list S3 blobs under `KOPIA_PREFIX`, derive first path segment)

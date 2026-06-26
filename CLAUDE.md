@@ -25,13 +25,15 @@ backups stored on S3, view individual snapshots, and download files/folders from
 
 ## Build / run / test
 
-> Filled in during M0. Target commands (Makefile):
+Makefile targets (Go 1.26, module `github.com/nicojeske/kopia-browser`):
 
-- `make run` — run locally (loads `.env`)
-- `make test` — unit tests
-- `make test-integration` — integration tests against real garage (needs creds in env; skips without)
-- `make build` — build binary
-- `make docker` — build image
+- `make run` — run locally; `internal/config` loads `.env` via godotenv
+- `make test` — unit tests (`go test ./...`)
+- `make test-integration` — `go test -tags=integration ./...`; no integration tests yet (added M1)
+- `make build` — build binary to `bin/kopia-browser`
+- `make docker` — build image (Dockerfile arrives M6)
+
+Equivalent raw commands work too (e.g. `go run ./cmd/kopia-browser`) if `make` is unavailable.
 
 ## Hard rules
 
