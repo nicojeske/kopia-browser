@@ -76,6 +76,54 @@ func TestListSnapshotsLive(t *testing.T) {
 	}
 }
 
+func TestDirLive(t *testing.T) {
+	mgr, _ := testManager(t)
+	ctx := context.Background()
+
+	snaps, err := mgr.ListSnapshots(ctx, "paperless")
+	if err != nil {
+		t.Fatalf("ListSnapshots: %v", err)
+	}
+	if len(snaps) == 0 {
+		t.Skip("no snapshots in paperless")
+	}
+	snapID := snaps[0].ID
+
+	// Root listing.
+	entries, err := mgr.Dir(ctx, "paperless", snapID, "")
+	if err != nil {
+		t.Fatalf("Dir(root): %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry at root")
+	}
+	t.Logf("root entries (%d): %v", len(entries), entryNames(entries))
+
+	// Descend into first subdir.
+	for _, e := range entries {
+		if e.IsDir {
+			sub, err := mgr.Dir(ctx, "paperless", snapID, e.Name)
+			if err != nil {
+				t.Fatalf("Dir(%q): %v", e.Name, err)
+			}
+			t.Logf("subdir %q entries (%d): %v", e.Name, len(sub), entryNames(sub))
+			return
+		}
+	}
+	t.Log("no subdirectory found at root")
+}
+
+func entryNames(entries []kopia.DirEntry) []string {
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name
+		if e.IsDir {
+			names[i] += "/"
+		}
+	}
+	return names
+}
+
 func contains(ss []string, want string) bool {
 	for _, s := range ss {
 		if s == want {

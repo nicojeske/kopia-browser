@@ -9,10 +9,13 @@ import (
 	"strings"
 	"sync"
 
+	kopiafs "github.com/kopia/kopia/fs"
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/blob/s3"
 	"github.com/kopia/kopia/repo/content"
+	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/snapshot"
+	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
@@ -159,6 +162,70 @@ func (m *Manager) open(ctx context.Context, ns string) (repo.Repository, error) 
 
 	m.repos[ns] = rep
 	return rep, nil
+}
+
+// Dir lists the entries of a directory within a snapshot. path is the
+// slash-separated path from the snapshot root (empty string = root). The caller
+// must supply a clean path with no ".." segments (see web.cleanBrowsePath).
+func (m *Manager) Dir(ctx context.Context, ns, snapID, path string) ([]DirEntry, error) {
+	rep, err := m.open(ctx, ns)
+	if err != nil {
+		return nil, err
+	}
+
+	man, err := snapshot.LoadSnapshot(ctx, rep, manifest.ID(snapID))
+	if err != nil {
+		return nil, fmt.Errorf("load snapshot %q: %w", snapID, err)
+	}
+
+	root, err := snapshotfs.SnapshotRoot(rep, man)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot root for %q: %w", snapID, err)
+	}
+
+	dir, ok := root.(kopiafs.Directory)
+	if !ok {
+		return nil, fmt.Errorf("snapshot root of %q is not a directory", snapID)
+	}
+
+	// Descend into the requested path one segment at a time.
+	if path != "" {
+		for _, seg := range strings.Split(path, "/") {
+			child, err := dir.Child(ctx, seg)
+			if err != nil {
+				return nil, fmt.Errorf("navigate to %q: %w", seg, err)
+			}
+			childDir, ok := child.(kopiafs.Directory)
+			if !ok {
+				return nil, fmt.Errorf("%q is not a directory", seg)
+			}
+			dir = childDir
+		}
+	}
+
+	entries, err := kopiafs.GetAllEntries(ctx, dir)
+	if err != nil {
+		return nil, fmt.Errorf("list entries: %w", err)
+	}
+
+	// Directories first, then alphabetically within each group.
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].IsDir() != entries[j].IsDir() {
+			return entries[i].IsDir()
+		}
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	out := make([]DirEntry, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, DirEntry{
+			Name:    e.Name(),
+			IsDir:   e.IsDir(),
+			Size:    e.Size(),
+			ModTime: e.ModTime(),
+		})
+	}
+	return out, nil
 }
 
 // Close closes every cached repository. Safe to call once at shutdown.

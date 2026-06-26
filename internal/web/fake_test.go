@@ -11,7 +11,9 @@ import (
 type fakeBackups struct {
 	namespaces []string
 	snapshots  map[string][]kopia.SnapshotInfo
-	err        error // when set, every method returns it
+	// dirs keys are "{snapID}|{path}" where path is empty string for root.
+	dirs map[string][]kopia.DirEntry
+	err  error // when set, every method returns it
 }
 
 func (f fakeBackups) ListNamespaces(context.Context) ([]string, error) {
@@ -26,4 +28,11 @@ func (f fakeBackups) ListSnapshots(_ context.Context, ns string) ([]kopia.Snapsh
 		return nil, f.err
 	}
 	return f.snapshots[ns], nil
+}
+
+func (f fakeBackups) Dir(_ context.Context, _, snapID, path string) ([]kopia.DirEntry, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.dirs[snapID+"|"+path], nil
 }

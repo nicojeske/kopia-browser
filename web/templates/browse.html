@@ -1,0 +1,33 @@
+{{template "head" .}}
+<div id="listing">{{template "browse-content" .}}</div>
+{{template "foot" .}}
+
+{{define "browse-content"}}
+<nav class="breadcrumb">
+  {{range $i, $c := .Crumbs}}{{if $i}} / {{end}}{{if $c.Href}}<a href="{{$c.Href}}">{{$c.Name}}</a>{{else}}{{$c.Name}}{{end}}{{end}}
+</nav>
+<h1>{{.Namespace}} — {{if .Path}}{{.Path}}{{else}}root{{end}}</h1>
+{{if .Entries}}
+<table class="entries">
+  <thead>
+    <tr><th>Name</th><th>Size</th><th>Modified</th></tr>
+  </thead>
+  <tbody>
+  {{range .Entries}}
+    <tr>
+      {{if .IsDir}}
+        <td class="entry-dir"><a href="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-get="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-target="#listing" hx-push-url="true">{{.Name}}/</a></td>
+        <td>—</td>
+      {{else}}
+        <td class="entry-file">{{.Name}}</td>
+        <td>{{humanBytes .Size}}</td>
+      {{end}}
+      <td>{{humanTime .ModTime}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">This directory is empty.</p>
+{{end}}
+{{end}}

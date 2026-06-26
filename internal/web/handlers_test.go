@@ -28,6 +28,7 @@ func newTestServer(t *testing.T, b Backups) http.Handler {
 const uglySourcePath = "/host_pods/abc/volumes/kubernetes.io~empty-dir/backup"
 
 func sampleData() fakeBackups {
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
 	return fakeBackups{
 		namespaces: []string{"paperless", "gitea"},
 		snapshots: map[string][]kopia.SnapshotInfo{
@@ -40,6 +41,17 @@ func sampleData() fakeBackups {
 				Tags:       map[string]string{"backup": "velero-daily-20260626", "path": uglySourcePath},
 			}},
 		},
+		dirs: map[string][]kopia.DirEntry{
+			"snap-1|": {
+				{Name: "data", IsDir: true, ModTime: now},
+				{Name: "logs", IsDir: true, ModTime: now},
+				{Name: "config.yaml", IsDir: false, Size: 1024, ModTime: now},
+			},
+			"snap-1|data": {
+				{Name: "documents", IsDir: true, ModTime: now},
+				{Name: "export.csv", IsDir: false, Size: 512 * 1024, ModTime: now},
+			},
+		},
 	}
 }
 
@@ -47,6 +59,7 @@ func TestHandlers(t *testing.T) {
 	tests := []struct {
 		name        string
 		target      string
+		headers     map[string]string
 		backups     Backups
 		wantStatus  int
 		wantContain []string
@@ -93,13 +106,58 @@ func TestHandlers(t *testing.T) {
 			wantStatus:  http.StatusOK,
 			wantContain: []string{"ok"},
 		},
+		{
+			name:       "browse root lists dirs and files",
+			target:     "/repo/paperless/snap/snap-1/browse/",
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantContain: []string{
+				"data", "logs", "config.yaml",
+				"Namespaces", // breadcrumb root link
+				"paperless",  // breadcrumb ns link
+			},
+			wantAbsent: []string{uglySourcePath, "host_pods"},
+		},
+		{
+			name:        "browse subdir lists its entries",
+			target:      "/repo/paperless/snap/snap-1/browse/data",
+			backups:     sampleData(),
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"documents", "export.csv"},
+		},
+		{
+			name:       "browse htmx request returns fragment without doctype",
+			target:     "/repo/paperless/snap/snap-1/browse/",
+			headers:    map[string]string{"HX-Request": "true"},
+			backups:    sampleData(),
+			wantStatus: http.StatusOK,
+			wantAbsent: []string{"<!DOCTYPE"},
+		},
+		{
+			name:        "browse full page has doctype",
+			target:      "/repo/paperless/snap/snap-1/browse/",
+			backups:     sampleData(),
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"<!DOCTYPE"},
+		},
+		{
+			name:       "browse data error yields 500",
+			target:     "/repo/paperless/snap/snap-1/browse/",
+			backups:    fakeBackups{err: errors.New("repo down")},
+			wantStatus: http.StatusInternalServerError,
+			wantContain: []string{"repo down"},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := newTestServer(t, tc.backups)
 			rec := httptest.NewRecorder()
-			srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.target, nil))
+			req := httptest.NewRequest(http.MethodGet, tc.target, nil)
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
+			srv.ServeHTTP(rec, req)
 
 			if rec.Code != tc.wantStatus {
 				t.Fatalf("status = %d, want %d (body: %s)", rec.Code, tc.wantStatus, rec.Body.String())
@@ -114,6 +172,34 @@ func TestHandlers(t *testing.T) {
 				if strings.Contains(body, absent) {
 					t.Errorf("body unexpectedly contains %q", absent)
 				}
+			}
+		})
+	}
+}
+
+func TestCleanBrowsePath(t *testing.T) {
+	tests := []struct {
+		in        string
+		wantClean string
+		wantSegs  []string
+	}{
+		{in: "", wantClean: "", wantSegs: nil},
+		{in: "data", wantClean: "data", wantSegs: []string{"data"}},
+		{in: "data/sub", wantClean: "data/sub", wantSegs: []string{"data", "sub"}},
+		{in: "..", wantClean: "", wantSegs: nil},           // resolves to root, safe
+		{in: "a/../b", wantClean: "b", wantSegs: []string{"b"}}, // resolved
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			clean, segs, err := cleanBrowsePath(tc.in)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if clean != tc.wantClean {
+				t.Errorf("clean = %q, want %q", clean, tc.wantClean)
+			}
+			if len(segs) != len(tc.wantSegs) {
+				t.Errorf("segs = %v, want %v", segs, tc.wantSegs)
 			}
 		})
 	}

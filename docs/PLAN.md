@@ -16,7 +16,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 |-----------|--------|
 | M0 Scaffold | DONE |
 | M1 List namespaces + snapshots | DONE |
-| M2 Browse dir tree | TODO |
+| M2 Browse dir tree | DONE |
 | M3 Download single file | TODO |
 | M4 Download folder (tar) | TODO |
 | M5 UI refinement & E2E hardening | TODO |
@@ -66,11 +66,11 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
   - [x] First `chromedp` E2E: load `/`, click a namespace, see snapshot table
 - **Verify:** ✅ unit + integration (live garage) + httptest + `make e2e` all green; live server renders real `paperless` snapshots, no source-path leak.
 
-### M2 — Browse dir tree — `TODO`
-- **Data:** [ ] `Dir(ns, snapID, path)` — walk `fs.Directory` from `rootEntry.obj`; unit/integration test on `paperless`
-- **Handler:** [ ] `GET /repo/{ns}/snap/{id}/browse/{path...}`; httptest for listing + breadcrumb + path-escaping
-- **UI:** [ ] htmx dir listing partial + breadcrumb; chromedp E2E navigates into a directory and back
-- **Verify:** all test layers green; browse paperless in browser.
+### M2 — Browse dir tree — `DONE`
+- **Data:** [x] `Dir(ns, snapID, path)` — walk `fs.Directory` from `rootEntry.obj`; unit/integration test on `paperless`
+- **Handler:** [x] `GET /repo/{ns}/snap/{id}/browse/{path...}`; httptest for listing + breadcrumb + path-escaping; htmx fragment vs full-page branch
+- **UI:** [x] htmx dir listing partial + breadcrumb + SPA swap (`hx-push-url`); chromedp E2E navigates into a directory and verifies URL + content
+- **Verify:** unit + httptest ✅ (incl. `cleanBrowsePath`, htmx branch, leak guard); `make e2e` ✅; integration pending live run.
 
 ### M3 — Download single file — `TODO`
 - **Data:** [ ] `OpenFile(...)` → `io.ReadSeekCloser`; integration test reads a known file

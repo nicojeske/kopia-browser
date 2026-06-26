@@ -2,6 +2,11 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-06-26 — M2 browse + SPA navigation
+- **htmx partial swap with `hx-push-url`** for dir navigation. Handler branches on `HX-Request: true` header: htmx gets only the `browse-content` fragment (inner HTML of `#listing`); plain browser gets the full `browse.html` page. `hx-push-url="true"` keeps the URL bar in sync so the back button works and links are shareable. `href` fallback on every dir link means navigation works without JS.
+- **Path sanitization in handler layer** (`cleanBrowsePath`). `{path...}` URL wildcard value is attacker-controllable. Strategy: prefix `"/"` + `path.Clean` (resolves `..` safely by treating as absolute) → strip leading `/`. After clean, `..` cannot escape root. Defensive segment check added as belt-and-suspenders. No existing sanitizer existed; new unit test covers edge cases.
+- **kopia fs tree walk API used** (`snapshotfs.SnapshotRoot` + `fs.Directory.Child` + `fs.GetAllEntries`). `snapshot.LoadSnapshot` (singular) fetches one manifest by ID. `snapshotfs.SnapshotRoot(rep, man)` returns `fs.Entry`; asserted to `fs.Directory`. Path descends via `dir.Child(ctx, seg)` per segment. Sort: dirs first, then alphabetically.
+
 ## 2026-06-26 — M1 data-layer choices
 - **Namespace enumeration via minio-go delimiter listing**, not kopia's `blob.Storage`. kopia's `Storage` exposes no delimiter/common-prefix listing, so deriving namespaces from it means scanning *every* blob in *every* repo. minio-go (already a transitive kopia dep) does a delimiter `ListObjects` returning common prefixes (`kopia/<ns>/`) in one round trip — cheap and always fresh, no cache/staleness logic. Cost: a second S3 client path alongside kopia's, encapsulated in `internal/kopia`. This supersedes ARCHITECTURE.md's earlier "no separate AWS SDK needed" note (minio ≠ AWS SDK, but the intent was kopia-only S3 access). Verified live: returns 30 real namespaces incl. `paperless`.
 - **Absolute kopia cache directory (required).** kopia's content cache nil-derefs (SIGSEGV in `contentCacheImpl.fetchBlobInternal`, storage `c.st` nil) when `CachingOptions.CacheDirectory` is a *relative* path. `kopia.New` resolves `KOPIA_CACHE_DIR` via `filepath.Abs` before use. Caught by live server run; unit/integration tests passed because they used absolute temp dirs.

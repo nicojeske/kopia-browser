@@ -19,3 +19,12 @@ type SnapshotInfo struct {
 	FileCount  int64             // total files (Stats.TotalFileCount)
 	Tags       map[string]string // full Velero tag set (backup, ns, pod, volume, ...)
 }
+
+// DirEntry is a UI-facing view of one entry (file or directory) within a
+// snapshot's directory tree. kopia fs.* types never escape this package.
+type DirEntry struct {
+	Name    string
+	IsDir   bool
+	Size    int64     // bytes; 0 for directories
+	ModTime time.Time
+}

@@ -9,7 +9,7 @@
   <tbody>
   {{range .Snapshots}}
     <tr>
-      <td>{{if .BackupName}}{{.BackupName}}{{else}}<span class="muted">{{.ID}}</span>{{end}}</td>
+      <td><a href="/repo/{{$.Namespace}}/snap/{{.ID}}/browse/">{{if .BackupName}}{{.BackupName}}{{else}}<span class="muted">{{.ID}}</span>{{end}}</a></td>
       <td>{{humanTime .StartTime}}</td>
       <td>{{humanBytes .TotalSize}}</td>
       <td>{{.FileCount}}</td>
