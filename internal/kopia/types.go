@@ -1,0 +1,21 @@
+// Package kopia is the read-only data layer: it talks to Garage S3 through the
+// kopia Go library and returns plain Go values. It has no knowledge of HTTP or
+// HTML, so handlers can be tested against a fake implementation. Every
+// operation here is strictly read-only (see CLAUDE.md hard rules).
+package kopia
+
+import "time"
+
+// SnapshotInfo is a UI-facing view of one kopia snapshot manifest, decoupled
+// from kopia's internal types so templates never import kopia. The ugly Velero
+// source path is deliberately omitted (see docs/KOPIA.md); friendly Tags are
+// kept instead.
+type SnapshotInfo struct {
+	ID         string            // snapshot manifest id
+	BackupName string            // Tags["backup"], the friendly Velero backup name
+	StartTime  time.Time         // snapshot start
+	EndTime    time.Time         // snapshot end
+	TotalSize  int64             // total file bytes (Stats.TotalFileSize)
+	FileCount  int64             // total files (Stats.TotalFileCount)
+	Tags       map[string]string // full Velero tag set (backup, ns, pod, volume, ...)
+}

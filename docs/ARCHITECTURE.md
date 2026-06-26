@@ -31,14 +31,14 @@ Loads env vars (see CLAUDE.md), validates required ones, loads `.env` in dev. Re
 ### internal/kopia — RepoManager
 The heart. Holds `map[namespace]*openRepo` with a mutex; repos opened lazily and reused.
 **Strictly read-only.** Responsibilities:
-- `ListNamespaces()` — uses kopia's `blob/s3` storage at prefix `KOPIA_PREFIX`, lists blobs, derives the first path segment as the namespace set. (No separate AWS SDK needed.)
+- `ListNamespaces()` — uses **minio-go** (already a transitive kopia dep) with a delimiter `ListObjects` under `KOPIA_PREFIX`, returning common prefixes (`kopia/<ns>/`) → first path segment is the namespace. kopia's own `blob.Storage` has no delimiter listing, so deriving namespaces from it would mean scanning every blob; the minio path is one round trip. (minio ≠ AWS SDK; see DECISIONS.md 2026-06-26.)
 - `Open(ns)` — `repo.Connect` (write config to a temp/cache path) + `repo.Open`, cached per namespace.
 - `ListSnapshots(ns)` — `snapshot.ListSnapshots`.
 - `Dir(ns, snapID, path)` — resolve snapshot, walk `fs.Directory` from `rootEntry.obj` to the requested path, return entries.
 - `OpenFile(ns, snapID, path)` — `io.ReadSeekCloser` for a file object.
 - `TarDir(ns, snapID, path, w)` — stream a tar of a directory subtree.
 
-kopia needs a cache directory — configured to a writable path (local dir in dev, volume in k8s).
+kopia needs a cache directory — configured via `KOPIA_CACHE_DIR` to a writable path (local `.kopia-cache` in dev, volume in k8s). **Must be absolute**: `kopia.New` resolves it with `filepath.Abs` because kopia's content cache nil-derefs on a relative path (see DECISIONS.md).
 
 ### internal/web
 stdlib `http.ServeMux` (Go 1.22 method + `{wildcard}` patterns, no router dependency).

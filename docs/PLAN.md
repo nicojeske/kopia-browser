@@ -15,7 +15,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | Milestone | Status |
 |-----------|--------|
 | M0 Scaffold | DONE |
-| M1 List namespaces + snapshots | TODO |
+| M1 List namespaces + snapshots | DONE |
 | M2 Browse dir tree | TODO |
 | M3 Download single file | TODO |
 | M4 Download folder (tar) | TODO |
@@ -50,21 +50,21 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - [x] CLAUDE.md + docs committed
 - **Verify:** ✅ build/vet/test green; server serves `/healthz`→`ok` and `/`→hello (200), `/{$}` 404s non-root; missing-required vars fail fast naming each.
 
-### M1 — List namespaces + snapshots — `TODO`
-- **Data:** `internal/kopia` RepoManager
-  - [ ] `ListNamespaces()` — list S3 blobs under `KOPIA_PREFIX`, derive first path segment
-  - [ ] `Open(ns)` — connect + open repo once per namespace, cached, read-only
-  - [ ] `ListSnapshots(ns)` via `snapshot.ListSnapshots`
-  - [ ] Integration test vs real garage: `paperless` present; snapshots non-empty
+### M1 — List namespaces + snapshots — `DONE`
+- **Data:** `internal/kopia` Manager (RepoManager)
+  - [x] `ListNamespaces()` — minio-go delimiter `ListObjects` under `KOPIA_PREFIX`, derive first path segment (see DECISIONS.md; cheaper than scanning all blobs)
+  - [x] `open(ns)` — connect + open repo once per namespace, cached, read-only
+  - [x] `ListSnapshots(ns)` via `snapshot.ListSnapshotManifests`+`LoadSnapshots`, newest first
+  - [x] Integration test vs real garage: `paperless` present; snapshots non-empty (verified live: 30 namespaces)
 - **Handler:**
-  - [ ] `GET /` → namespace list page
-  - [ ] `GET /repo/{ns}` → snapshot table (show `tags.backup`, `startTime`, size, file count; hide raw source path)
-  - [ ] `httptest` tests assert status + expected HTML (table-driven, with a fake/mock data layer)
+  - [x] `GET /` → namespace list page
+  - [x] `GET /repo/{ns}` → snapshot table (shows `tags.backup`, `startTime`, human size, file count; raw source path hidden)
+  - [x] `httptest` tests assert status + expected HTML (table-driven, fake data layer; asserts no `host_pods` leak)
 - **UI + test harness:**
-  - [ ] htmx page templates for both routes
-  - [ ] E2E harness: `internal/web` test helper that boots the server on a random port; `make e2e` target running `chromedp` (build tag `e2e`)
-  - [ ] First `chromedp` E2E: load `/`, click a namespace, see snapshot table
-- **Verify:** unit + integration + httptest + `make e2e` all green.
+  - [x] htmx page templates for both routes (`namespaces.html`, `snapshots.html`, shared `partials.html`); vendored htmx + css served at `/static/`
+  - [x] E2E harness: `httptest.NewServer` on a random port + fake data layer; `make e2e` runs `chromedp` (build tag `e2e`)
+  - [x] First `chromedp` E2E: load `/`, click a namespace, see snapshot table
+- **Verify:** ✅ unit + integration (live garage) + httptest + `make e2e` all green; live server renders real `paperless` snapshots, no source-path leak.
 
 ### M2 — Browse dir tree — `TODO`
 - **Data:** [ ] `Dir(ns, snapID, path)` — walk `fs.Directory` from `rootEntry.obj`; unit/integration test on `paperless`

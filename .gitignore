@@ -16,7 +16,13 @@ coverage.*
 
 # kopia cache / runtime
 /cache/
+/.kopia-cache/
 *.config
+# kopia metadata-cache spill (only appears if a relative cache dir is misused)
+/blob-list/
+/indexes/
+/kopia.repository
+/kopia.blobcfg
 *.config.update-info.json
 
 # OS / editor

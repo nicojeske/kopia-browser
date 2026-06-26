@@ -40,11 +40,13 @@ Each snapshot object:
 - `tags` — friendly Velero metadata: `backup` (backup name), `ns`, `pod`, `volume`, `snapshot-uploader` → **show these in UI**
 - `pins`, `retentionReason`
 
-## Go library notes (to confirm during implementation)
+## Go library notes (verified M1 against `github.com/kopia/kopia v0.22.3`)
 
-- Storage: `repo/blob/s3` `s3.New` with `BucketName, Endpoint, AccessKeyID, SecretAccessKey, Prefix, Region, DoNotUseTLS`.
-- Open: `repo.Connect` then `repo.Open` with the password.
-- Snapshots: `snapshot.ListSnapshots`.
-- Walk: `snapshot/snapshotfs` + `fs` to get directory entries from `rootEntry.obj`.
-- Read file: object reader from the repository; directory → build tar by walking `fs.Directory`.
-- Confirm exact APIs against the installed kopia version (CLI `0.22.3`).
+- **Library pinned:** `github.com/kopia/kopia v0.22.3` (matches CLI 0.22.3).
+- **Namespace listing:** done via **minio-go** delimiter `ListObjects` (common prefixes), NOT kopia's `blob.Storage` (which has no delimiter listing). Verified live: 30 namespaces incl. `paperless` (`ae2web ark camunda … paperless … website`).
+- **Storage:** `s3.New(ctx, *s3.Options, isCreate bool)` — pass `isCreate=false`. Fields used: `BucketName, Endpoint, AccessKeyID, SecretAccessKey, Region, Prefix (=KOPIA_PREFIX+ns+"/"), DoNotUseTLS:true`.
+- **Open:** `repo.Connect(ctx, cfgPath, st, password, &repo.ConnectOptions{ClientOptions:{ReadOnly:true}, CachingOptions:{CacheDirectory:<abs>}})` then `repo.Open(ctx, cfgPath, password, &repo.Options{})`. ⚠️ **`CacheDirectory` MUST be absolute** — a relative path causes a nil-deref SIGSEGV in kopia's content cache. Connect only when the config file is absent; reuse otherwise.
+- **Snapshots:** `snapshot.ListSnapshotManifests(ctx, rep, nil, nil)` → `snapshot.LoadSnapshots(ctx, rep, ids)` → `snapshot.SortByTime(mans, true)` (newest first). Source-agnostic.
+- **Manifest fields used:** `man.ID` (string), `man.Tags["backup"]`, `man.StartTime.ToTime()`, `man.Stats.TotalFileSize` (int64), `man.Stats.TotalFileCount` (int32).
+- **Verified Velero tag set** (live `paperless` snapshot): `backup`, `backup-uid`, `ns`, `pod`, `pod-uid`, `snapshot-requester` (`pod-volume-backup-restore`), `snapshot-uploader` (`kopia`), `volume`. `backup` is the friendly name shown in the UI.
+- **Still to confirm (M2+):** `snapshot/snapshotfs` + `fs.Directory`/`fs.File` iterate+Open API for tree walk from `rootEntry.obj`; tar streaming for folder download.

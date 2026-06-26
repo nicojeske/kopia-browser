@@ -1,4 +1,4 @@
-.PHONY: run test test-integration build docker
+.PHONY: run test test-integration e2e build docker
 
 # Run locally. godotenv loads .env from the working directory automatically.
 run:
@@ -12,6 +12,11 @@ test:
 # themselves when creds are absent. No integration tests exist yet (added M1).
 test-integration:
 	go test -tags=integration ./...
+
+# Browser end-to-end tests (build tag: e2e). Drives headless Chrome against the
+# server backed by a fake data layer; needs Chrome/Chromium installed.
+e2e:
+	go test -tags=e2e ./internal/web/...
 
 # Build the binary.
 build:

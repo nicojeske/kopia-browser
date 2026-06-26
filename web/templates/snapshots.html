@@ -1,0 +1,23 @@
+{{template "head" .}}
+<nav class="breadcrumb"><a href="/">Namespaces</a> / {{.Namespace}}</nav>
+<h1>{{.Namespace}} — snapshots</h1>
+{{if .Snapshots}}
+<table class="snapshots">
+  <thead>
+    <tr><th>Backup</th><th>Start time</th><th>Size</th><th>Files</th></tr>
+  </thead>
+  <tbody>
+  {{range .Snapshots}}
+    <tr>
+      <td>{{if .BackupName}}{{.BackupName}}{{else}}<span class="muted">{{.ID}}</span>{{end}}</td>
+      <td>{{humanTime .StartTime}}</td>
+      <td>{{humanBytes .TotalSize}}</td>
+      <td>{{.FileCount}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No snapshots in this namespace.</p>
+{{end}}
+{{template "foot" .}}

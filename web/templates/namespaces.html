@@ -1,0 +1,12 @@
+{{template "head" .}}
+<h1>Namespaces</h1>
+{{if .Namespaces}}
+<ul class="namespaces">
+  {{range .Namespaces}}
+  <li><a href="/repo/{{.}}">{{.}}</a></li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty">No namespaces found under the configured prefix.</p>
+{{end}}
+{{template "foot" .}}

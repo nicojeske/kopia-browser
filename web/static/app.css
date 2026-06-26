@@ -1,0 +1,36 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+header {
+  padding: .75rem 1.5rem;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+}
+.logo { font-weight: 600; text-decoration: none; color: inherit; }
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+h1 { font-size: 1.4rem; }
+a { color: LinkText; }
+.breadcrumb { font-size: .9rem; margin-bottom: .5rem; }
+.namespaces { list-style: none; padding: 0; }
+.namespaces li { margin: .25rem 0; }
+.namespaces a {
+  display: inline-block;
+  padding: .4rem .8rem;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: .4rem;
+  text-decoration: none;
+}
+.namespaces a:hover { background: color-mix(in srgb, CanvasText 8%, transparent); }
+table.snapshots { width: 100%; border-collapse: collapse; }
+table.snapshots th, table.snapshots td {
+  text-align: left;
+  padding: .5rem .75rem;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+}
+table.snapshots th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+.muted { opacity: .6; font-family: ui-monospace, monospace; font-size: .85em; }
+.empty { opacity: .7; }

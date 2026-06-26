@@ -40,7 +40,7 @@ Equivalent raw commands work too (e.g. `go run ./cmd/kopia-browser`) if `make` i
 - **Read-only.** Never write, modify, or delete anything in the kopia repos / S3 bucket. This app only reads.
 - **No secrets in git.** S3 creds + repo password come from env vars only. `.env` is gitignored; commit `.env.example` with empty values. Never paste real secret values into any committed file, doc, or commit message.
 - **Verify against reality.** kopia internals are subtle — run the binary / integration tests against real garage to confirm behavior, don't just trust compilation.
-- **Small commits.** One working increment per commit. Don't push unless asked.
+- **Small commits.** One working increment per commit. Claude may create atomic commits autonomously (no need to ask first) once a change builds + tests pass. Never push unless asked.
 
 ## Environment variables
 

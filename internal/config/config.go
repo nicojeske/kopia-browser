@@ -20,6 +20,7 @@ type Config struct {
 	S3SecretKey       string
 	KopiaRepoPassword string
 	KopiaPrefix       string
+	KopiaCacheDir     string
 	ListenAddr        string
 }
 
@@ -41,6 +42,7 @@ func Load() (*Config, error) {
 		S3SecretKey:       os.Getenv("S3_SECRET_KEY"),
 		KopiaRepoPassword: os.Getenv("KOPIA_REPO_PASSWORD"),
 		KopiaPrefix:       getenv("KOPIA_PREFIX", "kopia/"),
+		KopiaCacheDir:     getenv("KOPIA_CACHE_DIR", ".kopia-cache"),
 		ListenAddr:        getenv("LISTEN_ADDR", ":8080"),
 	}
 
