@@ -108,10 +108,17 @@ func (c *StatsCache) Get() StatsSnapshot {
 	return c.cur
 }
 
-// Run performs an immediate refresh, then repeats every interval.
+// Run refreshes immediately (unless cache is still fresh), then repeats every interval.
 // Exits when ctx is cancelled (e.g. on server shutdown).
 func (c *StatsCache) Run(ctx context.Context) {
-	c.refresh(ctx)
+	c.mu.RLock()
+	age := time.Since(c.cur.UpdatedAt)
+	c.mu.RUnlock()
+	if c.cur.UpdatedAt.IsZero() || age >= c.interval {
+		c.refresh(ctx)
+	} else {
+		slog.Info("stats: skipping initial refresh, cache is fresh", "age", age.Round(time.Second), "interval", c.interval)
+	}
 
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
