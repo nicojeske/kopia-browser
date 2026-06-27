@@ -123,7 +123,7 @@ func TestWriteTarTree(t *testing.T) {
 
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	if err := writeTarTree(context.Background(), tw, root, ""); err != nil {
+	if err := writeTarTree(context.Background(), tw, root, "", make([]byte, 1<<20)); err != nil {
 		t.Fatalf("writeTarTree: %v", err)
 	}
 	if err := tw.Close(); err != nil {

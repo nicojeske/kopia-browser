@@ -2,6 +2,7 @@ package kopia
 
 import (
 	"archive/tar"
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -306,16 +307,22 @@ func (m *Manager) TarDir(ctx context.Context, ns, snapID, dirPath string, w io.W
 	if err != nil {
 		return err
 	}
-	tw := tar.NewWriter(w)
-	if err := writeTarTree(ctx, tw, dir, ""); err != nil {
+	bw := bufio.NewWriterSize(w, 4<<20) // 4 MB — batch small tar writes into large TCP segments
+	tw := tar.NewWriter(bw)
+	buf := make([]byte, 1<<20) // 1 MB copy buffer, reused across all files
+	if err := writeTarTree(ctx, tw, dir, "", buf); err != nil {
 		return err
 	}
-	return tw.Close()
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	return bw.Flush()
 }
 
 // writeTarTree recursively writes the directory dir into tw.
 // prefix is the slash-separated path prefix prepended to each entry name.
-func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, prefix string) error {
+// buf is a reusable copy buffer; must be at least a few KB for efficiency.
+func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, prefix string, buf []byte) error {
 	return kopiafs.IterateEntries(ctx, dir, func(ctx context.Context, e kopiafs.Entry) error {
 		name := e.Name()
 		if prefix != "" {
@@ -332,7 +339,7 @@ func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, pr
 			if err := tw.WriteHeader(hdr); err != nil {
 				return fmt.Errorf("write tar header for dir %q: %w", name, err)
 			}
-			return writeTarTree(ctx, tw, v, name)
+			return writeTarTree(ctx, tw, v, name, buf)
 
 		case kopiafs.File:
 			hdr, err := tar.FileInfoHeader(e, "")
@@ -348,7 +355,7 @@ func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, pr
 			if err != nil {
 				return fmt.Errorf("open file %q: %w", name, err)
 			}
-			_, copyErr := io.Copy(tw, rc)
+			_, copyErr := io.CopyBuffer(tw, rc, buf)
 			closeErr := rc.Close()
 			if copyErr != nil {
 				return fmt.Errorf("copy file %q: %w", name, copyErr)
