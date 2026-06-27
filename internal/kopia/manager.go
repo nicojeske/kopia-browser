@@ -20,6 +20,7 @@ import (
 	"github.com/kopia/kopia/repo/content"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/snapshot"
+	"github.com/kopia/kopia/snapshot/policy"
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -103,6 +104,15 @@ func (m *Manager) ListSnapshots(ctx context.Context, ns string) ([]SnapshotInfo,
 	if err != nil {
 		return nil, fmt.Errorf("load snapshots for %q: %w", ns, err)
 	}
+	// RetentionReasons has json:"-" and is not stored in the manifest — it must
+	// be computed from the effective retention policy for each source group.
+	for _, group := range snapshot.GroupBySource(mans) {
+		pol, _, _, polErr := policy.GetEffectivePolicy(ctx, rep, group[0].Source)
+		if polErr == nil {
+			pol.RetentionPolicy.ComputeRetentionReasons(group)
+		}
+	}
+
 	mans = snapshot.SortByTime(mans, true) // reverse = newest first; SortByTime returns a new slice
 
 	out := make([]SnapshotInfo, 0, len(mans))
@@ -458,7 +468,9 @@ func (m *Manager) OpenFile(ctx context.Context, ns, snapID, path string) (io.Rea
 // order: Latest, Hourly, Daily, Weekly, Monthly, Annual. Any unrecognised
 // category is appended after the canonical ones.
 func retentionRoles(reasons []string) []string {
-	canonicalOrder := []string{"latest", "hourly", "daily", "weekly", "monthly", "annual"}
+	// "latest" is omitted: Velero data-mover sets KeepLatest >= total count so
+	// every snapshot carries it, making it indistinguishable noise in the UI.
+	canonicalOrder := []string{"hourly", "daily", "weekly", "monthly", "annual"}
 	seen := make(map[string]bool, len(reasons))
 	for _, r := range reasons {
 		// Each reason is "<category>-<n>"; strip the numeric suffix.

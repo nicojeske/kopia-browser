@@ -423,6 +423,7 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
+  overflow-x: auto;
 }
 .data-table {
   width: 100%;
@@ -480,6 +481,14 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
   color: var(--tx);
 }
 .snap-label:hover { color: var(--ac); }
+.snap-cell { width: 100%; }
+.snap-cell-inner { min-width: 0; overflow: hidden; }
+.snap-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .snap-id {
   font-family: 'Geist Mono', ui-monospace, monospace;
   font-size: 11px;
@@ -490,7 +499,7 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
   transition: color .12s;
 }
 .snap-id:hover { color: var(--tx2); }
-.snap-icon { color: var(--ac); display: flex; }
+.snap-icon { color: var(--ac); display: flex; flex-shrink: 0; }
 
 /* ── Snapshot retention / pin / error badges ─── */
 .snap-badge {

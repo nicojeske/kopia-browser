@@ -549,12 +549,13 @@ var templateFuncs = template.FuncMap{
 	"humanCount":    humanCount,
 	"urlPathEscape": url.PathEscape,
 	"fileCategory":  fileCategory,
-	"sliceStr":      func(s string, n int) string { // sliceStr returns the first n runes of s
+	"sliceStr": func(s string, n int) string {
 		if len(s) <= n {
 			return s
 		}
 		return s[:n]
 	},
+	"humanDuration": humanDuration,
 }
 
 // fileCategory maps a filename to a display category string used to select
@@ -598,6 +599,38 @@ func humanBytes(n int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
+}
+
+// humanDuration renders the duration between start and end as a compact string
+// (e.g. "< 1s", "5s", "2m 5s", "1h 2m"). Returns "—" if either time is zero.
+func humanDuration(start, end time.Time) string {
+	if start.IsZero() || end.IsZero() {
+		return "—"
+	}
+	d := end.Sub(start)
+	if d < 0 {
+		d = 0
+	}
+	if d < time.Second {
+		return "< 1s"
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	m := int(d.Minutes())
+	s := int(d.Seconds()) % 60
+	if d < time.Hour {
+		if s == 0 {
+			return fmt.Sprintf("%dm", m)
+		}
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	h := int(d.Hours())
+	m = int(d.Minutes()) % 60
+	if m == 0 {
+		return fmt.Sprintf("%dh", h)
+	}
+	return fmt.Sprintf("%dh %dm", h, m)
 }
 
 // humanRel renders a time as a relative string ("2h ago", "3d ago", etc.).

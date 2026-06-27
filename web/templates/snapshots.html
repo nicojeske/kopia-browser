@@ -36,7 +36,7 @@
     <thead>
       <tr>
         <th>Snapshot</th>
-        <th>Created</th>
+        <th class="col-r">Duration</th>
         <th class="col-r">Size</th>
         <th class="col-r">Files</th>
       </tr>
@@ -44,11 +44,11 @@
     <tbody>
       {{range .Snapshots}}
       <tr>
-        <td>
+        <td class="snap-cell">
           <div style="display:flex;align-items:center;gap:11px">
             <span class="snap-icon">{{template "icon-snapshot" .}}</span>
-            <div>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="snap-cell-inner">
+              <div class="snap-label-row">
                 <a href="/repo/{{$.Namespace}}/snap/{{.ID}}/browse/" class="snap-label">
                   {{if .BackupName}}{{.BackupName}}{{else}}{{humanTime .StartTime}}{{end}}
                 </a>
@@ -56,11 +56,12 @@
                 {{if .Pinned}}<span class="snap-badge snap-badge-pin">{{template "icon-pin" .}}</span>{{end}}
                 {{if gt .ErrorCount 0}}<span class="snap-badge snap-badge-err">{{.ErrorCount}} err</span>{{end}}
               </div>
+              {{if .BackupName}}<div class="snap-id">{{humanTime .StartTime}}</div>{{end}}
               <div class="snap-id" data-copy="{{.ID}}" title="Click to copy full ID">{{sliceStr .ID 8}}&hellip;</div>
             </div>
           </div>
         </td>
-        <td class="cell-num">{{humanTime .StartTime}}</td>
+        <td class="cell-num col-r">{{humanDuration .StartTime .EndTime}}</td>
         <td class="cell-num col-r">{{humanBytes .TotalSize}}</td>
         <td class="cell-num col-r">{{.FileCount}}</td>
       </tr>
