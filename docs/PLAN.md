@@ -107,11 +107,9 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - [x] Tests: `fakeStats`/`sampleStats()` in `fake_test.go`; 5 new handler assertions; 2 new E2E tests (dashboard search + sort pill).
 - **Verify:** `go test ./...` ✅, `go test -tags=e2e ./internal/web` ✅ (7 E2E), kapture visual pass (see JOURNAL.md).
 
-### M6 — Docker + k8s — `TODO`
+### M6 — Docker — `TODO`
 - [ ] Multi-stage `Dockerfile` (distroless/scratch)
-- [ ] k8s manifests: Deployment + Service + Ingress notes; env via Secret
-- [ ] Persistent kopia cache volume (or sized emptyDir)
-- **Verify:** image runs locally with env; manifests reviewed.
+- **Verify:** image runs locally with env.
 
 ## Out of scope
 - In-app auth (handled by SSO reverse proxy)
