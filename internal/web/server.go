@@ -149,7 +149,19 @@ func (s *server) handleVolumes(w http.ResponseWriter, r *http.Request) {
 		vols = append(vols, VolumeInfo{Name: name, Display: display, Count: b.count, Latest: b.latest})
 	}
 
-	s.render(w, "volumes.html", map[string]any{"Title": ns, "Namespace": ns, "Volumes": vols})
+	// Fetch namespace list for the persistent sidebar; degrade gracefully on error.
+	namespaces, nsErr := s.backups.ListNamespaces(r.Context())
+	if nsErr != nil {
+		log.Printf("handleVolumes: listing namespaces for sidebar: %v", nsErr)
+		namespaces = nil
+	}
+
+	s.render(w, "volumes.html", map[string]any{
+		"Title":      ns,
+		"Namespace":  ns,
+		"Volumes":    vols,
+		"Namespaces": namespaces,
+	})
 }
 
 // handleSnapshots lists the snapshots for a specific volume within a namespace.
@@ -176,12 +188,21 @@ func (s *server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	if display == "" {
 		display = "(no volume)"
 	}
+
+	// Fetch namespace list for the persistent sidebar; degrade gracefully on error.
+	namespaces, nsErr := s.backups.ListNamespaces(r.Context())
+	if nsErr != nil {
+		log.Printf("handleSnapshots: listing namespaces for sidebar: %v", nsErr)
+		namespaces = nil
+	}
+
 	s.render(w, "snapshots.html", map[string]any{
-		"Title":     ns + " / " + display,
-		"Namespace": ns,
-		"Volume":    volume,
-		"Display":   display,
-		"Snapshots": snaps,
+		"Title":      ns + " / " + display,
+		"Namespace":  ns,
+		"Volume":     volume,
+		"Display":    display,
+		"Snapshots":  snaps,
+		"Namespaces": namespaces,
 	})
 }
 
@@ -261,12 +282,20 @@ func (s *server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
+		// htmx fragment: browse-content never reads .Namespaces, skip the extra S3 call.
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := s.tpl.ExecuteTemplate(w, "browse-content", data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
+
+	// Full page: fetch namespace list for the persistent sidebar; degrade gracefully on error.
+	namespaces, nsErr := s.backups.ListNamespaces(r.Context())
+	if nsErr != nil {
+		log.Printf("handleBrowse: listing namespaces for sidebar: %v", nsErr)
+	}
+	data["Namespaces"] = namespaces
 	s.render(w, "browse.html", data)
 }
 
@@ -350,7 +379,17 @@ func (s *server) render(w http.ResponseWriter, name string, data any) {
 }
 
 func (s *server) renderError(w http.ResponseWriter, code int, what string, err error) {
-	http.Error(w, fmt.Sprintf("%s: %v", what, err), code)
+	msg := fmt.Sprintf("%s: %v", what, err)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(code)
+	if terr := s.tpl.ExecuteTemplate(w, "error.html", map[string]any{
+		"Title":   "Error",
+		"Code":    code,
+		"Message": msg,
+	}); terr != nil {
+		// Template failed; headers already sent — log and bail.
+		log.Printf("renderError: template execute: %v", terr)
+	}
 }
 
 // templateFuncs are helpers available in all templates.

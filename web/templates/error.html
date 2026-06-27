@@ -1,0 +1,10 @@
+{{template "head" .}}
+
+<div class="error-page">
+  <div class="page-eyebrow">Error {{.Code}}</div>
+  <h1>Something went wrong</h1>
+  <p class="error-msg">{{.Message}}</p>
+  <a href="/" class="error-back">← Back to namespaces</a>
+</div>
+
+{{template "foot" .}}
