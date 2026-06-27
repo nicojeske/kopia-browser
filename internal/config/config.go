@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,18 +16,19 @@ import (
 
 // Config holds all runtime configuration. See CLAUDE.md for the env var list.
 type Config struct {
-	S3Endpoint           string
-	S3Region             string
-	S3Bucket             string
-	S3AccessKey          string
-	S3SecretKey          string
-	KopiaRepoPassword    string
-	KopiaPrefix          string
-	KopiaCacheDir        string
-	ListenAddr           string
-	StatsRefreshInterval time.Duration // how often the background stats cache refreshes
-	StatsCacheFile       string        // path to persist stats snapshot across restarts; "" disables
-	LogLevel             slog.Level    // minimum log level; controlled by LOG_LEVEL env var (default info)
+	S3Endpoint              string
+	S3Region                string
+	S3Bucket                string
+	S3AccessKey             string
+	S3SecretKey             string
+	KopiaRepoPassword       string
+	KopiaPrefix             string
+	KopiaCacheDir           string
+	KopiaContentCacheMB     int64         // KOPIA_CONTENT_CACHE_MB; 0 = disabled
+	ListenAddr              string
+	StatsRefreshInterval    time.Duration // how often the background stats cache refreshes
+	StatsCacheFile          string        // path to persist stats snapshot across restarts; "" disables
+	LogLevel                slog.Level    // minimum log level; controlled by LOG_LEVEL env var (default info)
 }
 
 // Load reads configuration from the environment. In development a .env file in
@@ -44,8 +46,10 @@ func Load() (*Config, error) {
 		refreshInterval = 60 * time.Minute
 	}
 
+	contentCacheMB, _ := strconv.ParseInt(getenv("KOPIA_CONTENT_CACHE_MB", "5120"), 10, 64)
+
 	cfg := &Config{
-		LogLevel: parseLevel(getenv("LOG_LEVEL", "info")),
+		LogLevel:             parseLevel(getenv("LOG_LEVEL", "info")),
 		S3Endpoint:           os.Getenv("S3_ENDPOINT"),
 		S3Region:             getenv("S3_REGION", "garage"),
 		S3Bucket:             getenv("S3_BUCKET", "velero-backup"),
@@ -54,6 +58,7 @@ func Load() (*Config, error) {
 		KopiaRepoPassword:    os.Getenv("KOPIA_REPO_PASSWORD"),
 		KopiaPrefix:          getenv("KOPIA_PREFIX", "kopia/"),
 		KopiaCacheDir:        getenv("KOPIA_CACHE_DIR", ".kopia-cache"),
+		KopiaContentCacheMB:  contentCacheMB,
 		ListenAddr:           getenv("LISTEN_ADDR", ":8080"),
 		StatsRefreshInterval: refreshInterval,
 	}
