@@ -785,6 +785,27 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
 .sort-pill.active { background: var(--surf3); color: var(--tx); }
 .sort-caret { display: flex; }
 
+/* ── Sortable table headers ───────────────────────────── */
+.data-table th.th-sort {
+  cursor: pointer;
+  user-select: none;
+  transition: color .12s;
+}
+.data-table th.th-sort:hover { color: var(--tx); }
+.data-table th.th-sort.sort-active { color: var(--tx); }
+.th-sort-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.th-sort-inner.col-r { justify-content: flex-end; }
+.th-sort-caret {
+  display: flex;
+  opacity: 0;
+  transition: opacity .12s;
+}
+.th-sort.sort-active .th-sort-caret { opacity: 1; }
+
 /* ── Stats-calculating notice ─────────────────────────── */
 .stats-calculating {
   font-size: 12.5px;

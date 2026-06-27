@@ -1,4 +1,4 @@
-﻿{{template "head" .}}
+{{template "head" .}}
 <div id="listing">{{template "browse-content" .}}</div>
 {{template "foot" .}}
 
@@ -27,18 +27,33 @@
 {{if .Entries}}
 
 <div class="table-wrap">
-  <table class="data-table">
+  <table class="data-table" id="browse-table">
     <thead>
       <tr>
-        <th>Name</th>
-        <th class="col-r">Size</th>
-        <th class="col-r">Modified</th>
+        <th class="th-sort" data-sort="name" data-asc="true">
+          <div class="th-sort-inner">
+            Name
+            <span class="th-sort-caret">{{template "icon-caret-down" .}}</span>
+          </div>
+        </th>
+        <th class="col-r th-sort" data-sort="size" data-asc="false">
+          <div class="th-sort-inner col-r">
+            Size
+            <span class="th-sort-caret">{{template "icon-caret-down" .}}</span>
+          </div>
+        </th>
+        <th class="col-r th-sort" data-sort="mtime" data-asc="false">
+          <div class="th-sort-inner col-r">
+            Modified
+            <span class="th-sort-caret">{{template "icon-caret-down" .}}</span>
+          </div>
+        </th>
         <th style="width:44px"></th>
       </tr>
     </thead>
     <tbody>
       {{range .Entries}}
-      <tr>
+      <tr data-name="{{.Name}}" data-size="{{.Size}}" data-mtime="{{.ModTime.Unix}}" data-dir="{{if .IsDir}}1{{else}}0{{end}}">
         {{if .IsDir}}
         <td>
           <div class="entry-cell">
@@ -50,7 +65,7 @@
                hx-push-url="true">{{.Name}}/</a>
           </div>
         </td>
-        <td class=”cell-num col-r”>{{humanBytes .Size}}</td>
+        <td class="cell-num col-r">{{humanBytes .Size}}</td>
         <td class="cell-num col-r">{{humanTime .ModTime}}</td>
         <td class="col-r" style="padding:11px 14px">
           <a class="btn-tar"
@@ -73,6 +88,69 @@
     </tbody>
   </table>
 </div>
+
+<script>
+(function(){
+  var table = document.getElementById('browse-table');
+  if (!table) return;
+  var tbody = table.querySelector('tbody');
+  var headers = table.querySelectorAll('thead th.th-sort');
+
+  var sortKey = null;
+  var sortAsc = true;
+
+  var caretUpSVG   = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6"/></svg>';
+  var caretDownSVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10l6 6 6-6"/></svg>';
+
+  function applySort() {
+    if (!sortKey) return;
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort(function(a, b) {
+      // Folders always before files, regardless of sort direction.
+      var aDir = parseInt(a.dataset.dir, 10);
+      var bDir = parseInt(b.dataset.dir, 10);
+      if (aDir !== bDir) return bDir - aDir;
+
+      // Then sort by column.
+      if (sortKey === 'name') {
+        var cmp = a.dataset.name.localeCompare(b.dataset.name, undefined, {sensitivity: 'base'});
+        return sortAsc ? cmp : -cmp;
+      } else {
+        var av = parseInt(a.dataset[sortKey], 10) || 0;
+        var bv = parseInt(b.dataset[sortKey], 10) || 0;
+        return sortAsc ? av - bv : bv - av;
+      }
+    });
+    rows.forEach(function(r) { tbody.appendChild(r); });
+  }
+
+  function updateHeaders() {
+    headers.forEach(function(th) {
+      var isActive = th.dataset.sort === sortKey;
+      th.classList.toggle('sort-active', isActive);
+      var caret = th.querySelector('.th-sort-caret');
+      if (caret) {
+        caret.innerHTML = sortAsc ? caretUpSVG : caretDownSVG;
+      }
+    });
+  }
+
+  headers.forEach(function(th) {
+    th.addEventListener('click', function() {
+      var key = this.dataset.sort;
+      if (key === sortKey) {
+        sortAsc = !sortAsc;
+      } else {
+        sortKey = key;
+        // Name defaults asc; size/mtime default desc (largest/newest first).
+        sortAsc = (key === 'name');
+      }
+      updateHeaders();
+      applySort();
+    });
+  });
+})();
+</script>
 
 {{else}}
 <p class="empty">This directory is empty.</p>
