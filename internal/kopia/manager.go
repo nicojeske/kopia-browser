@@ -103,7 +103,7 @@ func (m *Manager) ListSnapshots(ctx context.Context, ns string) ([]SnapshotInfo,
 	if err != nil {
 		return nil, fmt.Errorf("load snapshots for %q: %w", ns, err)
 	}
-	snapshot.SortByTime(mans, true) // reverse = newest first
+	mans = snapshot.SortByTime(mans, true) // reverse = newest first; SortByTime returns a new slice
 
 	out := make([]SnapshotInfo, 0, len(mans))
 	for _, man := range mans {
@@ -118,14 +118,24 @@ func (m *Manager) ListSnapshots(ctx context.Context, ns string) ([]SnapshotInfo,
 			}
 		}
 
+		// Prefer RootEntry.DirSummary for full-tree totals: man.Stats only
+		// counts files actually uploaded in this run, so unchanged subtrees
+		// are missing and the count is too low on incremental snapshots.
+		size := man.Stats.TotalFileSize
+		count := int64(man.Stats.TotalFileCount)
+		if man.RootEntry != nil && man.RootEntry.DirSummary != nil {
+			size = man.RootEntry.DirSummary.TotalFileSize
+			count = man.RootEntry.DirSummary.TotalFileCount
+		}
+
 		out = append(out, SnapshotInfo{
 			ID:         string(man.ID),
 			BackupName: man.Tags["backup"],
 			Volume:     volume,
 			StartTime:  man.StartTime.ToTime(),
 			EndTime:    man.EndTime.ToTime(),
-			TotalSize:  man.Stats.TotalFileSize,
-			FileCount:  int64(man.Stats.TotalFileCount),
+			TotalSize:  size,
+			FileCount:  count,
 			Tags:       man.Tags,
 		})
 	}
