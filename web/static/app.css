@@ -514,6 +514,14 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
 }
 .entry-icon { display: flex; flex-shrink: 0; color: var(--ac); }
 .entry-icon.file { color: var(--tx3); }
+.entry-icon.file.cat-image   { color: var(--vio); }
+.entry-icon.file.cat-video   { color: #f0883e; }
+.entry-icon.file.cat-audio   { color: #d2a8ff; }
+.entry-icon.file.cat-archive { color: #d4a72c; }
+.entry-icon.file.cat-code    { color: var(--ac); }
+.entry-icon.file.cat-pdf     { color: #e5534b; }
+.entry-icon.file.cat-doc     { color: #6cb6ff; }
+.entry-icon.file.cat-sheet   { color: #57ab5a; }
 .entry-dir-link {
   text-decoration: none;
   color: var(--tx);

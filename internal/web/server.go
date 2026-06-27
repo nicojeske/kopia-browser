@@ -548,6 +548,36 @@ var templateFuncs = template.FuncMap{
 	"humanRel":      humanRel,
 	"humanCount":    humanCount,
 	"urlPathEscape": url.PathEscape,
+	"fileCategory":  fileCategory,
+}
+
+// fileCategory maps a filename to a display category string used to select
+// the appropriate icon and colour class in the browse template. The returned
+// value is one of: image, video, audio, archive, code, pdf, doc, sheet, file.
+func fileCategory(name string) string {
+	ext := strings.ToLower(path.Ext(name))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico", ".tiff", ".tif", ".heic", ".heif", ".avif":
+		return "image"
+	case ".mp4", ".mkv", ".mov", ".avi", ".webm", ".wmv", ".flv", ".m4v", ".ogv", ".mts":
+		return "video"
+	case ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".wma", ".aiff":
+		return "audio"
+	case ".zip", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".7z", ".rar", ".zst", ".lz4", ".lzma":
+		return "archive"
+	case ".go", ".js", ".jsx", ".ts", ".tsx", ".py", ".rb", ".rs", ".java", ".c", ".cpp", ".cc", ".h", ".hpp",
+		".sh", ".bash", ".zsh", ".fish", ".ps1", ".yaml", ".yml", ".json", ".toml", ".xml", ".html", ".htm",
+		".css", ".scss", ".sass", ".sql", ".lua", ".php", ".swift", ".kt", ".cs", ".dart", ".vim", ".tf":
+		return "code"
+	case ".pdf":
+		return "pdf"
+	case ".doc", ".docx", ".odt", ".rtf", ".md", ".txt", ".rst", ".tex":
+		return "doc"
+	case ".xls", ".xlsx", ".ods", ".csv", ".tsv":
+		return "sheet"
+	default:
+		return "file"
+	}
 }
 
 // humanBytes renders a byte count as a human-readable binary size.

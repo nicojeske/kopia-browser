@@ -75,7 +75,7 @@
         {{else}}
         <td>
           <div class="entry-cell">
-            <span class="entry-icon file">{{template "icon-file" .}}</span>
+            <span class="entry-icon file cat-{{fileCategory .Name}}">{{template "file-icon" .Name}}</span>
             <a href="{{$.DownloadBase}}/{{urlPathEscape .Name}}" class="entry-file-link">{{.Name}}</a>
           </div>
         </td>
