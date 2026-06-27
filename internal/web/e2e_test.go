@@ -37,8 +37,8 @@ func TestE2ENamespaceToVolumes(t *testing.T) {
 		chromedp.Navigate(srv.URL+"/"),
 		chromedp.WaitVisible(`a[href="/repo/paperless"]`, chromedp.ByQuery),
 		chromedp.Click(`a[href="/repo/paperless"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.volumes`, chromedp.ByQuery),
-		chromedp.Text(`table.volumes`, &tableText, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
+		chromedp.Text(`table.data-table`, &tableText, chromedp.ByQuery),
 	)
 	if err != nil {
 		if isNoBrowser(err) {
@@ -74,10 +74,10 @@ func TestE2ENamespaceToSnapshots(t *testing.T) {
 		chromedp.Navigate(srv.URL+"/"),
 		chromedp.WaitVisible(`a[href="/repo/paperless"]`, chromedp.ByQuery),
 		chromedp.Click(`a[href="/repo/paperless"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.volumes`, chromedp.ByQuery),
-		chromedp.Click(`table.volumes a[href*="/vol/data-pvc"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.snapshots`, chromedp.ByQuery),
-		chromedp.Text(`table.snapshots`, &tableText, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
+		chromedp.Click(`table.data-table a[href*="/vol/data-pvc"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
+		chromedp.Text(`table.data-table`, &tableText, chromedp.ByQuery),
 	)
 	if err != nil {
 		if isNoBrowser(err) {
@@ -114,20 +114,20 @@ func TestE2EBrowseDir(t *testing.T) {
 		chromedp.Navigate(srv.URL+"/"),
 		chromedp.WaitVisible(`a[href="/repo/paperless"]`, chromedp.ByQuery),
 		chromedp.Click(`a[href="/repo/paperless"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.volumes`, chromedp.ByQuery),
-		chromedp.Click(`table.volumes a[href*="/vol/data-pvc"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.snapshots`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
+		chromedp.Click(`table.data-table a[href*="/vol/data-pvc"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
 
 		// Click the snapshot browse link → root dir listing.
-		chromedp.Click(`table.snapshots a[href*="/browse/"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.entries`, chromedp.ByQuery),
-		chromedp.Text(`table.entries`, &listingText, chromedp.ByQuery),
+		chromedp.Click(`table.data-table a[href*="/browse/"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
+		chromedp.Text(`table.data-table`, &listingText, chromedp.ByQuery),
 
 		// Click into the "data" subdir (htmx partial swap).
 		// Wait for "documents" link — it only exists in data/, confirming the swap completed.
-		chromedp.Click(`table.entries .entry-dir a`, chromedp.ByQuery),
-		chromedp.WaitVisible(`table.entries .entry-dir a[href*="documents"]`, chromedp.ByQuery),
-		chromedp.Text(`table.entries`, &subText, chromedp.ByQuery),
+		chromedp.Click(`table.data-table a.entry-dir-link`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table a.entry-dir-link[href*="documents"]`, chromedp.ByQuery),
+		chromedp.Text(`table.data-table`, &subText, chromedp.ByQuery),
 		chromedp.Location(&urlAfterNav),
 	)
 	if err != nil {
@@ -170,9 +170,9 @@ func TestE2EDownloadLink(t *testing.T) {
 	err := chromedp.Run(ctx,
 		// Navigate to the root browse listing.
 		chromedp.Navigate(srv.URL+"/repo/paperless/snap/snap-1/browse/"),
-		chromedp.WaitVisible(`table.entries`, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
 		// Get the href of the file download link.
-		chromedp.AttributeValue(`table.entries .entry-file a`, "href", &linkHref, nil, chromedp.ByQuery),
+		chromedp.AttributeValue(`table.data-table a.entry-file-link`, "href", &linkHref, nil, chromedp.ByQuery),
 	)
 	if err != nil {
 		if isNoBrowser(err) {
@@ -207,9 +207,9 @@ func TestE2EFolderTarLink(t *testing.T) {
 	var tarLinkHref, folderBtnHref string
 	err := chromedp.Run(ctx,
 		chromedp.Navigate(srv.URL+"/repo/paperless/snap/snap-1/browse/"),
-		chromedp.WaitVisible(`table.entries`, chromedp.ByQuery),
-		// tar link on the first dir row (second td, sibling of .entry-dir).
-		chromedp.AttributeValue(`table.entries .tar-link`, "href", &tarLinkHref, nil, chromedp.ByQuery),
+		chromedp.WaitVisible(`table.data-table`, chromedp.ByQuery),
+		// tar link on the first dir row.
+		chromedp.AttributeValue(`.btn-tar`, "href", &tarLinkHref, nil, chromedp.ByQuery),
 		// current-folder download button.
 		chromedp.AttributeValue(`.btn-download-folder`, "href", &folderBtnHref, nil, chromedp.ByQuery),
 	)
