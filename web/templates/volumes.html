@@ -22,8 +22,8 @@
     <thead>
       <tr>
         <th>Volume</th>
-        <th class="col-r">Snapshots</th>
-        <th class="col-r">Latest backup</th>
+        <th>Snapshots</th>
+        <th>Latest backup</th>
       </tr>
     </thead>
     <tbody>
@@ -35,8 +35,8 @@
             <span class="cell-mono">{{.Display}}</span>
           </a>
         </td>
-        <td class="cell-num col-r">{{.Count}}</td>
-        <td class="cell-num col-r">{{humanTime .Latest}}</td>
+        <td class="cell-num">{{.Count}}</td>
+        <td class="cell-num">{{humanTime .Latest}}</td>
       </tr>
       {{end}}
     </tbody>

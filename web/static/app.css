@@ -430,7 +430,7 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
   border-collapse: collapse;
 }
 .data-table thead tr { background: var(--surf2); }
-.data-table th:not(.col-r) {
+.data-table th {
   text-align: left;
   padding: 11px 18px;
   font-size: 11px;
