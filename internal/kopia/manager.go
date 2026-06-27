@@ -186,25 +186,15 @@ func (m *Manager) open(ctx context.Context, ns string) (repo.Repository, error) 
 	}
 	cfgPath := filepath.Join(nsDir, "repo.config")
 
-	cachingOpts := content.CachingOptions{
-		CacheDirectory:        filepath.Join(nsDir, "cache"),
-		ContentCacheSizeBytes: m.cfg.KopiaContentCacheMB * 1024 * 1024,
-	}
-
 	// Connect writes the config file; only do it once. On a persistent cache the
 	// file survives restarts, so reuse it and just Open.
 	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
 		err = repo.Connect(ctx, cfgPath, st, m.cfg.KopiaRepoPassword, &repo.ConnectOptions{
 			ClientOptions:  repo.ClientOptions{ReadOnly: true},
-			CachingOptions: cachingOpts,
+			CachingOptions: content.CachingOptions{CacheDirectory: filepath.Join(nsDir, "cache")},
 		})
 		if err != nil {
 			return nil, fmt.Errorf("connect repo %q: %w", ns, err)
-		}
-	} else {
-		// Patch existing config so cache settings stay current across upgrades.
-		if serr := repo.SetCachingOptions(ctx, cfgPath, &cachingOpts); serr != nil {
-			slog.Warn("kopia: could not update cache settings", "ns", ns, "err", serr)
 		}
 	}
 
