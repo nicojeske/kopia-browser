@@ -33,7 +33,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cache := kopia.NewStatsCache(mgr, cfg.StatsRefreshInterval)
+	cache := kopia.NewStatsCache(mgr, cfg.StatsRefreshInterval, cfg.StatsCacheFile)
 	go cache.Run(ctx)
 
 	defer mgr.Close(context.Background())

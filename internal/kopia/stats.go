@@ -2,7 +2,10 @@ package kopia
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -78,17 +81,24 @@ func computeNamespaceStats(name string, snaps []SnapshotInfo) NamespaceStats {
 // StatsCache holds the latest computed StatsSnapshot and refreshes it
 // periodically by calling the Manager. Safe for concurrent use.
 type StatsCache struct {
-	mgr      *Manager
-	interval time.Duration
+	mgr         *Manager
+	interval    time.Duration
+	persistPath string
 
 	mu  sync.RWMutex
 	cur StatsSnapshot
 }
 
 // NewStatsCache creates a StatsCache that refreshes on the given interval.
-// Call Run(ctx) in a goroutine to start background refreshes.
-func NewStatsCache(mgr *Manager, interval time.Duration) *StatsCache {
-	return &StatsCache{mgr: mgr, interval: interval}
+// persistPath is the file used to save/restore the snapshot across restarts;
+// pass "" to disable persistence. Call Run(ctx) in a goroutine to start
+// background refreshes.
+func NewStatsCache(mgr *Manager, interval time.Duration, persistPath string) *StatsCache {
+	c := &StatsCache{mgr: mgr, interval: interval, persistPath: persistPath}
+	if persistPath != "" {
+		c.load()
+	}
+	return c
 }
 
 // Get returns a copy of the latest StatsSnapshot. Safe for concurrent calls.
@@ -169,4 +179,50 @@ func (c *StatsCache) refresh(ctx context.Context) {
 	c.mu.Unlock()
 
 	log.Printf("stats: refresh done — %d namespaces, %d snapshots", len(namespaces), totalSnaps)
+
+	if c.persistPath != "" {
+		c.save(snap)
+	}
+}
+
+// load reads a persisted StatsSnapshot from disk. Errors are logged and ignored
+// so a missing or corrupt file never prevents startup.
+func (c *StatsCache) load() {
+	data, err := os.ReadFile(c.persistPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("stats: load %q: %v", c.persistPath, err)
+		}
+		return
+	}
+	var snap StatsSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		log.Printf("stats: load %q: %v", c.persistPath, err)
+		return
+	}
+	c.mu.Lock()
+	c.cur = snap
+	c.mu.Unlock()
+	log.Printf("stats: loaded cached snapshot from %s (age %s)", c.persistPath, time.Since(snap.UpdatedAt).Round(time.Second))
+}
+
+// save writes snap to persistPath atomically (write-then-rename).
+func (c *StatsCache) save(snap StatsSnapshot) {
+	data, err := json.Marshal(snap)
+	if err != nil {
+		log.Printf("stats: save marshal: %v", err)
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(c.persistPath), 0o755); err != nil {
+		log.Printf("stats: save mkdir: %v", err)
+		return
+	}
+	tmp := c.persistPath + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		log.Printf("stats: save write: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, c.persistPath); err != nil {
+		log.Printf("stats: save rename: %v", err)
+	}
 }

@@ -24,6 +24,7 @@ type Config struct {
 	KopiaCacheDir        string
 	ListenAddr           string
 	StatsRefreshInterval time.Duration // how often the background stats cache refreshes
+	StatsCacheFile       string        // path to persist stats snapshot across restarts; "" disables
 }
 
 // Load reads configuration from the environment. In development a .env file in
@@ -53,6 +54,8 @@ func Load() (*Config, error) {
 		ListenAddr:           getenv("LISTEN_ADDR", ":8080"),
 		StatsRefreshInterval: refreshInterval,
 	}
+
+	cfg.StatsCacheFile = getenv("STATS_CACHE_FILE", cfg.KopiaCacheDir+"/stats-cache.json")
 
 	var missing []string
 	for _, r := range []struct {
