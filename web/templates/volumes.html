@@ -1,22 +1,49 @@
-{{template "head" .}}
-<nav class="breadcrumb"><a href="/">Namespaces</a> / {{.Namespace}}</nav>
-<h1>{{.Namespace}} — volumes</h1>
+﻿{{template "head" .}}
+
+<nav class="breadcrumb">
+  <a href="/">Namespaces</a>
+  <span class="breadcrumb-sep">{{template "icon-chevron" .}}</span>
+  <span class="breadcrumb-current">{{.Namespace}}</span>
+</nav>
+
+<div class="page-eyebrow">Namespace</div>
+<h1 class="mono">{{.Namespace}}</h1>
+
 {{if .Volumes}}
-<table class="volumes">
-  <thead>
-    <tr><th>Volume</th><th>Snapshots</th><th>Latest backup</th></tr>
-  </thead>
-  <tbody>
-  {{range .Volumes}}
-    <tr>
-      <td><a href="/repo/{{$.Namespace}}/vol/{{urlPathEscape .Name}}">{{.Display}}</a></td>
-      <td>{{.Count}}</td>
-      <td>{{humanTime .Latest}}</td>
-    </tr>
-  {{end}}
-  </tbody>
-</table>
+<div class="stats-row">
+  <div>
+    <div class="stat-label">Volumes</div>
+    <div class="stat-value">{{len .Volumes}}</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Volume</th>
+        <th class="col-r">Snapshots</th>
+        <th class="col-r">Latest backup</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Volumes}}
+      <tr>
+        <td>
+          <a href="/repo/{{$.Namespace}}/vol/{{urlPathEscape .Name}}" class="vol-name-cell">
+            <span class="vol-icon">{{template "icon-volume" .}}</span>
+            <span class="cell-mono">{{.Display}}</span>
+          </a>
+        </td>
+        <td class="cell-num col-r">{{.Count}}</td>
+        <td class="cell-num col-r">{{humanTime .Latest}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
 {{else}}
 <p class="empty">No snapshots in this namespace.</p>
 {{end}}
+
 {{template "foot" .}}

@@ -1,33 +1,79 @@
-{{template "head" .}}
+﻿{{template "head" .}}
 <div id="listing">{{template "browse-content" .}}</div>
 {{template "foot" .}}
 
 {{define "browse-content"}}
 <nav class="breadcrumb">
-  {{range $i, $c := .Crumbs}}{{if $i}} / {{end}}{{if $c.Href}}<a href="{{$c.Href}}">{{$c.Name}}</a>{{else}}{{$c.Name}}{{end}}{{end}}
-</nav>
-<h1>{{.Namespace}} — {{if .Path}}{{.Path}}{{else}}root{{end}}</h1>
-<a class="btn-download-folder" href="{{.DownloadBase}}/">Download this folder (.tar)</a>
-{{if .Entries}}
-<table class="entries">
-  <thead>
-    <tr><th>Name</th><th>Size</th><th>Modified</th></tr>
-  </thead>
-  <tbody>
-  {{range .Entries}}
-    <tr>
-      {{if .IsDir}}
-        <td class="entry-dir"><a href="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-get="{{$.BrowseBase}}/{{urlPathEscape .Name}}" hx-target="#listing" hx-push-url="true">{{.Name}}/</a></td>
-        <td><a class="tar-link" href="{{$.DownloadBase}}/{{urlPathEscape .Name}}">tar</a></td>
-      {{else}}
-        <td class="entry-file"><a href="{{$.DownloadBase}}/{{urlPathEscape .Name}}">{{.Name}}</a></td>
-        <td>{{humanBytes .Size}}</td>
-      {{end}}
-      <td>{{humanTime .ModTime}}</td>
-    </tr>
+  {{range $i, $c := .Crumbs}}
+  {{if $i}}<span class="breadcrumb-sep">{{template "icon-chevron" .}}</span>{{end}}
+  {{if $c.Href}}<a href="{{$c.Href}}">{{$c.Name}}</a>{{else}}<span class="breadcrumb-current">{{$c.Name}}</span>{{end}}
   {{end}}
-  </tbody>
-</table>
+</nav>
+
+<div class="browse-header-row">
+  <div>
+    <div class="page-eyebrow">Snapshot Â· {{.Namespace}}</div>
+    <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:9px">
+      <span style="color:var(--ac);display:flex">{{template "icon-folder" .}}</span>
+      {{if .Path}}{{.Path}}{{else}}root{{end}}
+    </h1>
+  </div>
+  <a class="btn-download-folder" href="{{.DownloadBase}}/">
+    {{template "icon-download" .}}
+    Download .tar
+  </a>
+</div>
+
+{{if .Entries}}
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th class="col-r">Size</th>
+        <th class="col-r">Modified</th>
+        <th style="width:44px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Entries}}
+      <tr>
+        {{if .IsDir}}
+        <td>
+          <div class="entry-cell">
+            <span class="entry-icon">{{template "icon-folder" .}}</span>
+            <a href="{{$.BrowseBase}}/{{urlPathEscape .Name}}"
+               class="entry-dir-link"
+               hx-get="{{$.BrowseBase}}/{{urlPathEscape .Name}}"
+               hx-target="#listing"
+               hx-push-url="true">{{.Name}}/</a>
+          </div>
+        </td>
+        <td class=”cell-dim col-r”>—</td>
+        <td class="cell-num col-r">{{humanTime .ModTime}}</td>
+        <td class="col-r" style="padding:11px 14px">
+          <a class="btn-tar"
+             href="{{$.DownloadBase}}/{{urlPathEscape .Name}}"
+             title="Download as .tar">{{template "icon-download-sm" .}}</a>
+        </td>
+        {{else}}
+        <td>
+          <div class="entry-cell">
+            <span class="entry-icon file">{{template "icon-file" .}}</span>
+            <a href="{{$.DownloadBase}}/{{urlPathEscape .Name}}" class="entry-file-link">{{.Name}}</a>
+          </div>
+        </td>
+        <td class="cell-num col-r">{{humanBytes .Size}}</td>
+        <td class="cell-num col-r">{{humanTime .ModTime}}</td>
+        <td></td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
 {{else}}
 <p class="empty">This directory is empty.</p>
 {{end}}

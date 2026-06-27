@@ -1,0 +1,8 @@
+Geist and Geist Mono fonts
+Copyright (c) Vercel, Inc.
+
+Licensed under the SIL Open Font License, Version 1.1.
+https://scripts.sil.org/OFL
+
+Downloaded from Google Fonts (fonts.gstatic.com) for self-hosting.
+Original source: https://github.com/vercel/geist-font

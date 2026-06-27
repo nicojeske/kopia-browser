@@ -1,23 +1,72 @@
-{{template "head" .}}
-<nav class="breadcrumb"><a href="/">Namespaces</a> / <a href="/repo/{{.Namespace}}">{{.Namespace}}</a> / {{.Display}}</nav>
-<h1>{{.Namespace}} / {{.Display}} — snapshots</h1>
+﻿{{template "head" .}}
+
+<nav class="breadcrumb">
+  <a href="/">Namespaces</a>
+  <span class="breadcrumb-sep">{{template "icon-chevron" .}}</span>
+  <a href="/repo/{{.Namespace}}">{{.Namespace}}</a>
+  <span class="breadcrumb-sep">{{template "icon-chevron" .}}</span>
+  <span class="breadcrumb-current">{{.Display}}</span>
+</nav>
+
+<div class="page-eyebrow">Volume Â· {{.Namespace}}</div>
+<h1 class="mono">{{.Display}}</h1>
+
 {{if .Snapshots}}
-<table class="snapshots">
-  <thead>
-    <tr><th>Backup</th><th>Start time</th><th>Size</th><th>Files</th></tr>
-  </thead>
-  <tbody>
-  {{range .Snapshots}}
-    <tr>
-      <td><a href="/repo/{{$.Namespace}}/snap/{{.ID}}/browse/">{{if .BackupName}}{{.BackupName}}{{else}}<span class="muted">{{.ID}}</span>{{end}}</a></td>
-      <td>{{humanTime .StartTime}}</td>
-      <td>{{humanBytes .TotalSize}}</td>
-      <td>{{.FileCount}}</td>
-    </tr>
-  {{end}}
-  </tbody>
-</table>
+<div class="stats-row">
+  <div>
+    <div class="stat-label">Snapshots</div>
+    <div class="stat-value">{{len .Snapshots}}</div>
+  </div>
+  <div>
+    <div class="stat-label">Latest</div>
+    <div class="stat-value">{{humanTime (index .Snapshots 0).StartTime}}</div>
+  </div>
+  <div>
+    <div class="stat-label">Latest size</div>
+    <div class="stat-value">{{humanBytes (index .Snapshots 0).TotalSize}}</div>
+  </div>
+  <div>
+    <div class="stat-label">Latest files</div>
+    <div class="stat-value">{{(index .Snapshots 0).FileCount}}</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Snapshot</th>
+        <th>Created</th>
+        <th class="col-r">Size</th>
+        <th class="col-r">Files</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Snapshots}}
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:11px">
+            <span class="snap-icon">{{template "icon-snapshot" .}}</span>
+            <div>
+              <a href="/repo/{{$.Namespace}}/snap/{{.ID}}/browse/" class="snap-label">
+                {{if .BackupName}}{{.BackupName}}{{else}}{{.ID}}{{end}}
+              </a>
+              {{if .BackupName}}
+              <div class="snap-id">{{.ID}}</div>
+              {{end}}
+            </div>
+          </div>
+        </td>
+        <td class="cell-num">{{humanTime .StartTime}}</td>
+        <td class="cell-num col-r">{{humanBytes .TotalSize}}</td>
+        <td class="cell-num col-r">{{.FileCount}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
 {{else}}
 <p class="empty">No snapshots for this volume.</p>
 {{end}}
+
 {{template "foot" .}}

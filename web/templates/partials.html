@@ -8,9 +8,136 @@
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
-<header><a href="/" class="logo">kopia-browser</a></header>
-<main>{{end}}
+<div class="app-shell">
 
-{{define "foot"}}</main>
+  <aside class="sidebar">
+    <a href="/" class="sidebar-brand">
+      <span class="brand-icon">{{template "icon-logo" .}}</span>
+      <span class="brand-text">
+        <span class="brand-name">kopia<span class="brand-dot">·</span>browser</span>
+        <span class="brand-sub">backup explorer</span>
+      </span>
+    </a>
+
+    <div class="sidebar-section-label">
+      <span>Namespaces</span>
+      {{if .Namespaces}}<span>{{len .Namespaces}}</span>{{end}}
+    </div>
+
+    <nav class="sidebar-nav">
+      {{if .Namespaces}}
+        {{$cur := $.Namespace}}
+        {{range .Namespaces}}
+        <a href="/repo/{{.}}" class="sidebar-item{{if eq . $cur}} active{{end}}">
+          <span class="item-dot"></span>
+          <span class="item-name">{{.}}</span>
+        </a>
+        {{end}}
+      {{else if .Namespace}}
+      <a href="/" class="sidebar-item back">
+        <span class="item-back-arrow">←</span>
+        <span style="font-size:12px;color:var(--tx3)">All namespaces</span>
+      </a>
+      <div class="sidebar-item active" style="cursor:default">
+        <span class="item-dot"></span>
+        <span class="item-name">{{.Namespace}}</span>
+      </div>
+      {{end}}
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="footer-icon">{{template "icon-shield" .}}</span>
+      <span>Read-only · no writes</span>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <span class="topbar-title">{{.Title}}</span>
+      <span class="badge-readonly">
+        <span class="badge-dot"></span>
+        Read-only
+      </span>
+    </header>
+    <main class="main-content">
+      <div class="inner">
+{{end}}
+
+{{define "foot"}}
+      </div>
+    </main>
+  </div>
+</div>
 </body>
 </html>{{end}}
+
+{{/* ── SVG icon helpers ── */}}
+
+{{define "icon-logo"}}
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 7.5 12 4l7 3.5v9L12 20l-7-3.5z"/>
+  <path d="M5 7.5 12 11l7-3.5"/>
+  <path d="M12 11v9"/>
+</svg>
+{{end}}
+
+{{define "icon-shield"}}
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5 18.5 6v5c0 4-2.8 6.8-6.5 7.8C8.3 17.8 5.5 15 5.5 11V6z"/>
+</svg>
+{{end}}
+
+{{define "icon-folder"}}
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h3.8l2 2.2h8.2A1.5 1.5 0 0 1 20.5 8.7v8.8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/>
+</svg>
+{{end}}
+
+{{define "icon-file"}}
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M13 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z"/>
+  <path d="M13 3.5V8.5h5"/>
+</svg>
+{{end}}
+
+{{define "icon-volume"}}
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h3.8l2 2.2h8.2A1.5 1.5 0 0 1 20.5 8.7v8.8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/>
+</svg>
+{{end}}
+
+{{define "icon-snapshot"}}
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8"/>
+  <circle cx="12" cy="12" r="3"/>
+</svg>
+{{end}}
+
+{{define "icon-download"}}
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 4v11"/>
+  <path d="M7.5 11 12 15.5 16.5 11"/>
+  <path d="M5 19.5h14"/>
+</svg>
+{{end}}
+
+{{define "icon-download-sm"}}
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 4v11"/>
+  <path d="M7.5 11 12 15.5 16.5 11"/>
+  <path d="M5 19.5h14"/>
+</svg>
+{{end}}
+
+{{define "icon-chevron"}}
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9.5 6 15 12l-5.5 6"/>
+</svg>
+{{end}}
+
+{{define "icon-clock"}}
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8"/>
+  <path d="M12 8.2v4l2.8 1.8"/>
+</svg>
+{{end}}

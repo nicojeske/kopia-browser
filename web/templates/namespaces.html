@@ -1,12 +1,26 @@
-{{template "head" .}}
-<h1>Namespaces</h1>
+﻿{{template "head" .}}
+
+<div class="page-eyebrow">Overview</div>
+<h1>Velero backups</h1>
+<p class="page-desc">Each Kubernetes namespace backed up to Garage S3 has its own encrypted kopia repository. Browse snapshots and restore individual files.</p>
+
 {{if .Namespaces}}
-<ul class="namespaces">
+<div class="ns-grid" style="margin-top:28px">
   {{range .Namespaces}}
-  <li><a href="/repo/{{.}}">{{.}}</a></li>
+  <a href="/repo/{{.}}" class="ns-card">
+    <div class="ns-card-header">
+      <span class="ns-dot"></span>
+      <span class="ns-card-name">{{.}}</span>
+    </div>
+    <div class="ns-card-footer">
+      {{template "icon-clock" .}}
+      <span>Click to browse snapshots</span>
+    </div>
+  </a>
   {{end}}
-</ul>
+</div>
 {{else}}
 <p class="empty">No namespaces found under the configured prefix.</p>
 {{end}}
+
 {{template "foot" .}}
