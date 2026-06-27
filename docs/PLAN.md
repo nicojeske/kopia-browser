@@ -21,6 +21,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M4 Download folder (tar) | DONE |
 | M5 UI refinement & E2E hardening | DONE |
 | M6 Docker + k8s | TODO |
+| M7 Dashboard stats & enriched sidebar | DONE |
 
 Statuses: `TODO` → `IN PROGRESS` → `DONE`.
 
@@ -33,7 +34,7 @@ separately-testable layer rather than an afterthought.
 |-------|---------|----------------|-----------|
 | Data | `internal/kopia` | pure kopia ops, no HTTP/HTML | Go unit + integration (real garage, `-tags=integration`) |
 | Handler | `internal/web` | call data layer, render templates | Go `httptest` (assert status + HTML) |
-| UI | `web/templates` | htmx pages, interactions, downloads | browser E2E via `chromedp` (headless, `make e2e`) + kapture MCP ad-hoc |
+| UI | `web/templates` | htmx pages, interactions, downloads | browser E2E via `chromedp` (headless, `make e2e`) |
 
 A feature isn't `DONE` until all three layers exist and their tests pass.
 
@@ -93,6 +94,18 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - [x] Updated E2E selectors for redesigned CSS classes (`table.data-table`, `.entry-dir-link`, `.entry-file-link`, `.btn-tar`).
 - [x] kapture visual pass: index, volumes, snapshots, browse, error page — all visually confirmed.
 - **Verify:** `go test ./...` ✅, `make e2e` ✅, kapture visual pass ✅, no external font requests ✅.
+
+### M7 — Dashboard stats & enriched sidebar — `DONE`
+- [x] `internal/kopia/stats.go` — `NamespaceStats`, `StatsSnapshot`, `computeNamespaceStats` (pure helper), `StatsCache` (background ticker + RWMutex).
+- [x] `internal/kopia/stats_test.go` — table-driven unit tests for `computeNamespaceStats`.
+- [x] `internal/config/config.go` — `StatsRefreshInterval` from `STATS_REFRESH_INTERVAL` env (default 15m).
+- [x] `cmd/kopia-browser/main.go` — wire `StatsCache`, `go cache.Run(ctx)`, pass to `NewServer`; graceful shutdown via `context.WithCancel`.
+- [x] `internal/web/server.go` — `Stats` interface, `injectSidebarData` helper, `handleIndex` enriched with stat cards + ns cards; `humanRel`, `humanCount` template funcs; `sidebarNSItem`/`sidebarRepo` types.
+- [x] `web/templates/partials.html` — sidebar search, enriched nav rows (dot + name + snapshot count), repository footer (drive icon + size + composition bar + shield line), new icon defines (`icon-search`, `icon-drive`, `icon-caret-up`, `icon-caret-down`), sidebar search JS in `foot`.
+- [x] `web/templates/namespaces.html` — 4 stat cards, search box + sort pills, enriched namespace grid (volumes/snapshots/stored mini-stats + size bar + last-backup), client-side filter+sort JS, "calculating" note when not ready.
+- [x] `web/static/app.css` — stat cards, search box, sort pills, enriched ns-card stats, size bar, sidebar search, sidebar repo footer.
+- [x] Tests: `fakeStats`/`sampleStats()` in `fake_test.go`; 5 new handler assertions; 2 new E2E tests (dashboard search + sort pill).
+- **Verify:** `go test ./...` ✅, `go test -tags=e2e ./internal/web` ✅ (7 E2E), kapture visual pass (see JOURNAL.md).
 
 ### M6 — Docker + k8s — `TODO`
 - [ ] Multi-stage `Dockerfile` (distroless/scratch)

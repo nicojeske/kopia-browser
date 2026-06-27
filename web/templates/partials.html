@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{.Title}} · kopia-browser</title>
+  <title>{{.Title}} &middot; kopia-browser</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
@@ -14,28 +14,33 @@
     <a href="/" class="sidebar-brand">
       <span class="brand-icon">{{template "icon-logo" .}}</span>
       <span class="brand-text">
-        <span class="brand-name">kopia<span class="brand-dot">·</span>browser</span>
+        <span class="brand-name">kopia<span class="brand-dot">&middot;</span>browser</span>
         <span class="brand-sub">backup explorer</span>
       </span>
     </a>
 
-    <div class="sidebar-section-label">
-      <span>Namespaces</span>
-      {{if .Namespaces}}<span>{{len .Namespaces}}</span>{{end}}
+    <div class="sidebar-search">
+      <span class="sidebar-search-icon">{{template "icon-search" .}}</span>
+      <input id="side-search" type="text" placeholder="Filter namespaces" autocomplete="off">
     </div>
 
-    <nav class="sidebar-nav">
-      {{if .Namespaces}}
-        {{$cur := $.Namespace}}
-        {{range .Namespaces}}
-        <a href="/repo/{{.}}" class="sidebar-item{{if eq . $cur}} active{{end}}">
+    <div class="sidebar-section-label">
+      <span>Namespaces</span>
+      {{if .SidebarNS}}<span>{{len .SidebarNS}}</span>{{end}}
+    </div>
+
+    <nav class="sidebar-nav" id="sidebar-nav">
+      {{if .SidebarNS}}
+        {{range .SidebarNS}}
+        <a href="/repo/{{.Name}}" class="sidebar-item{{if .Active}} active{{end}}" data-name="{{.Name}}">
           <span class="item-dot"></span>
-          <span class="item-name">{{.}}</span>
+          <span class="item-name">{{.Name}}</span>
+          {{if .Snapshots}}<span class="item-snap-count">{{.Snapshots}}</span>{{end}}
         </a>
         {{end}}
       {{else if .Namespace}}
       <a href="/" class="sidebar-item back">
-        <span class="item-back-arrow">←</span>
+        <span class="item-back-arrow">&larr;</span>
         <span style="font-size:12px;color:var(--tx3)">All namespaces</span>
       </a>
       <div class="sidebar-item active" style="cursor:default">
@@ -45,9 +50,30 @@
       {{end}}
     </nav>
 
-    <div class="sidebar-footer">
-      <span class="footer-icon">{{template "icon-shield" .}}</span>
-      <span>Read-only · no writes</span>
+    <div class="sidebar-repo">
+      {{if .SidebarRepo.Ready}}
+      <div class="sidebar-repo-header">
+        <span class="sidebar-repo-icon">{{template "icon-drive" .}}</span>
+        <span>Repository</span>
+      </div>
+      <div class="sidebar-repo-size">
+        <span class="sidebar-repo-total">{{.SidebarRepo.Size}}</span>
+        <span class="sidebar-repo-across">across {{.SidebarRepo.NSCount}} repos</span>
+      </div>
+      {{if .SidebarRepo.Segments}}
+      <div class="repo-bar">
+        {{range .SidebarRepo.Segments}}<span class="repo-seg" style="width:{{.Pct}}%"></span>{{end}}
+      </div>
+      {{end}}
+      {{end}}
+      <div class="sidebar-footer">
+        <span class="footer-icon">{{template "icon-shield" .}}</span>
+        {{if .SidebarRepo.Ready}}
+        <span>Read-only &middot; {{.SidebarRepo.Snapshots}} snapshots</span>
+        {{else}}
+        <span>Read-only &middot; no writes</span>
+        {{end}}
+      </div>
     </div>
   </aside>
 
@@ -68,6 +94,19 @@
     </main>
   </div>
 </div>
+<script>
+(function(){
+  var si = document.getElementById('side-search');
+  if (!si) return;
+  si.addEventListener('input', function(){
+    var q = this.value.toLowerCase();
+    var items = document.querySelectorAll('#sidebar-nav .sidebar-item[data-name]');
+    items.forEach(function(el){
+      el.style.display = !q || el.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+})();
+</script>
 </body>
 </html>{{end}}
 
@@ -84,6 +123,34 @@
 {{define "icon-shield"}}
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
   <path d="M12 3.5 18.5 6v5c0 4-2.8 6.8-6.5 7.8C8.3 17.8 5.5 15 5.5 11V6z"/>
+</svg>
+{{end}}
+
+{{define "icon-search"}}
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="10.5" cy="10.5" r="6.5"/>
+  <path d="M20 20l-4.3-4.3"/>
+</svg>
+{{end}}
+
+{{define "icon-drive"}}
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 13h17"/>
+  <path d="M6 13 7.8 6.4A1 1 0 0 1 8.8 5.7h6.4a1 1 0 0 1 1 .7L18 13"/>
+  <path d="M5 13v4.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V13"/>
+  <path d="M8 16h.01"/>
+</svg>
+{{end}}
+
+{{define "icon-caret-up"}}
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 14l6-6 6 6"/>
+</svg>
+{{end}}
+
+{{define "icon-caret-down"}}
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 10l6 6 6-6"/>
 </svg>
 {{end}}
 

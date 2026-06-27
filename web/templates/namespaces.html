@@ -1,26 +1,171 @@
-﻿{{template "head" .}}
+{{template "head" .}}
 
 <div class="page-eyebrow">Overview</div>
 <h1>Velero backups</h1>
 <p class="page-desc">Each Kubernetes namespace backed up to Garage S3 has its own encrypted kopia repository. Browse snapshots and restore individual files.</p>
 
-{{if .Namespaces}}
-<div class="ns-grid" style="margin-top:28px">
-  {{range .Namespaces}}
-  <a href="/repo/{{.}}" class="ns-card">
+{{if .StatCards}}
+<div class="stat-cards">
+  {{range .StatCards}}
+  <div class="stat-card">
+    <div class="stat-card-label">{{.Label}}</div>
+    <div class="stat-card-value">
+      <span class="stat-card-num">{{.Value}}</span>
+      {{if .Unit}}<span class="stat-card-unit">{{.Unit}}</span>{{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{if .Cards}}
+<div class="dash-controls">
+  <div class="search-box">
+    <span class="search-icon">{{template "icon-search" .}}</span>
+    <input id="ns-search" type="text" placeholder="Search namespaces" autocomplete="off">
+  </div>
+  <div class="sort-group">
+    <span class="sort-label">Sort</span>
+    <div class="sort-pills" id="sort-pills">
+      <button class="sort-pill active" data-sort="size" data-asc="false">
+        Size <span class="sort-caret">{{template "icon-caret-down" .}}</span>
+      </button>
+      <button class="sort-pill" data-sort="snapshots" data-asc="false">Count</button>
+      <button class="sort-pill" data-sort="name" data-asc="true">Name</button>
+      <button class="sort-pill" data-sort="last" data-asc="false">Recent</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{if .NotReady}}
+<p class="stats-calculating">Statistics are being calculated&hellip; data below may be incomplete.</p>
+{{end}}
+
+{{if .Cards}}
+<div class="ns-grid" id="ns-grid">
+  {{range .Cards}}
+  <a href="/repo/{{.Name}}" class="ns-card"
+     data-name="{{.Name}}"
+     data-size="{{.SizeBytes}}"
+     data-snapshots="{{.Snapshots}}"
+     data-last="{{.LastUnix}}">
     <div class="ns-card-header">
       <span class="ns-dot"></span>
-      <span class="ns-card-name">{{.}}</span>
+      <span class="ns-card-name">{{.Name}}</span>
     </div>
-    <div class="ns-card-footer">
-      {{template "icon-clock" .}}
-      <span>Click to browse snapshots</span>
+    <div class="ns-card-stats">
+      <div class="ns-stat">
+        <div class="ns-stat-val">{{.Volumes}}</div>
+        <div class="ns-stat-lbl">volumes</div>
+      </div>
+      <div class="ns-stat">
+        <div class="ns-stat-val">{{.Snapshots}}</div>
+        <div class="ns-stat-lbl">snapshots</div>
+      </div>
+      <div class="ns-stat ns-stat-right">
+        <div class="ns-stat-val">{{.SizeLabel}}</div>
+        <div class="ns-stat-lbl">stored</div>
+      </div>
+    </div>
+    <div class="ns-card-bar-row">
+      <div class="size-bar">
+        <span class="size-bar-fill" style="width:{{.BarPct}}%"></span>
+      </div>
+      <div class="ns-card-footer">
+        {{template "icon-clock" .}}
+        <span>Last backup {{.LastLabel}}</span>
+      </div>
     </div>
   </a>
   {{end}}
 </div>
+<div id="ns-no-results" class="empty" style="display:none">No namespaces match your search.</div>
 {{else}}
 <p class="empty">No namespaces found under the configured prefix.</p>
 {{end}}
+
+<script>
+(function(){
+  var grid = document.getElementById('ns-grid');
+  var searchInput = document.getElementById('ns-search');
+  var noResults = document.getElementById('ns-no-results');
+  var pills = document.querySelectorAll('#sort-pills .sort-pill');
+  if (!grid) return;
+
+  var cards = Array.from(grid.querySelectorAll('.ns-card'));
+  var sortKey = 'size';
+  var sortAsc = false;
+
+  var caretUpSVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6"/></svg>';
+  var caretDownSVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10l6 6 6-6"/></svg>';
+
+  function applyFilter(q) {
+    var ql = q ? q.toLowerCase() : '';
+    var shown = 0;
+    cards.forEach(function(c) {
+      var match = !ql || c.dataset.name.toLowerCase().includes(ql);
+      c.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    if (noResults) noResults.style.display = (shown === 0 && ql) ? '' : 'none';
+  }
+
+  function applySort() {
+    var sorted = cards.slice().sort(function(a, b) {
+      var av, bv;
+      if (sortKey === 'name') {
+        av = a.dataset.name; bv = b.dataset.name;
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      } else if (sortKey === 'size') {
+        av = parseInt(a.dataset.size, 10) || 0;
+        bv = parseInt(b.dataset.size, 10) || 0;
+      } else if (sortKey === 'snapshots') {
+        av = parseInt(a.dataset.snapshots, 10) || 0;
+        bv = parseInt(b.dataset.snapshots, 10) || 0;
+      } else {
+        av = parseInt(a.dataset.last, 10) || 0;
+        bv = parseInt(b.dataset.last, 10) || 0;
+      }
+      return sortAsc ? av - bv : bv - av;
+    });
+    sorted.forEach(function(c) { grid.appendChild(c); });
+  }
+
+  function updatePills(activeKey) {
+    pills.forEach(function(p) {
+      var isActive = p.dataset.sort === activeKey;
+      p.classList.toggle('active', isActive);
+      var caret = p.querySelector('.sort-caret');
+      if (caret) {
+        caret.innerHTML = sortAsc ? caretUpSVG : caretDownSVG;
+      }
+    });
+  }
+
+  pills.forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      var key = this.dataset.sort;
+      if (key === sortKey) {
+        sortAsc = !sortAsc;
+      } else {
+        sortKey = key;
+        sortAsc = (key === 'name');
+      }
+      updatePills(sortKey);
+      applySort();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      applyFilter(this.value);
+    });
+  }
+
+  // Initial sort: size descending (matches default active pill).
+  applySort();
+})();
+</script>
 
 {{template "foot" .}}

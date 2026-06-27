@@ -17,7 +17,7 @@ import (
 
 // TestE2ENamespaceToVolumes checks that clicking a namespace shows the volume list.
 func TestE2ENamespaceToVolumes(t *testing.T) {
-	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
 	defer srv.Close()
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -54,7 +54,7 @@ func TestE2ENamespaceToVolumes(t *testing.T) {
 
 // TestE2ENamespaceToSnapshots navigates namespace → volume → snapshot list.
 func TestE2ENamespaceToSnapshots(t *testing.T) {
-	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
 	defer srv.Close()
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -93,7 +93,7 @@ func TestE2ENamespaceToSnapshots(t *testing.T) {
 
 // TestE2EBrowseDir navigates into a snapshot's directory tree and back.
 func TestE2EBrowseDir(t *testing.T) {
-	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
 	defer srv.Close()
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -151,7 +151,7 @@ func TestE2EBrowseDir(t *testing.T) {
 // TestE2EDownloadLink checks that file entries in the browse listing have a
 // download link pointing to the /download/ route (not hx-get driven).
 func TestE2EDownloadLink(t *testing.T) {
-	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
 	defer srv.Close()
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -189,7 +189,7 @@ func TestE2EDownloadLink(t *testing.T) {
 // TestE2EFolderTarLink checks that directory rows have a tar download link
 // and that the current-folder download button is present on the browse page.
 func TestE2EFolderTarLink(t *testing.T) {
-	srv := httptest.NewServer(newTestServer(t, sampleData()))
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
 	defer srv.Close()
 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -225,6 +225,82 @@ func TestE2EFolderTarLink(t *testing.T) {
 	}
 	if !strings.Contains(folderBtnHref, "/download/") {
 		t.Errorf("folder download button href = %q, expected to contain /download/", folderBtnHref)
+	}
+}
+
+// TestE2EDashboardSearch checks that the namespace search input filters cards.
+func TestE2EDashboardSearch(t *testing.T) {
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
+	defer srv.Close()
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.NoSandbox,
+	)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAlloc()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+	ctx, cancelTimeout := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelTimeout()
+
+	var giteaDisplay string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(srv.URL+"/"),
+		chromedp.WaitVisible(`#ns-search`, chromedp.ByQuery),
+		// Type "paperless" into the search box — "gitea" card should be hidden.
+		chromedp.SendKeys(`#ns-search`, "paperless", chromedp.ByQuery),
+		// Get computed display style of the gitea card; it should be "none".
+		chromedp.Evaluate(`document.querySelector('.ns-card[data-name="gitea"]').style.display`, &giteaDisplay),
+	)
+	if err != nil {
+		if isNoBrowser(err) {
+			t.Skipf("no Chrome/Chromium available for E2E: %v", err)
+		}
+		t.Fatalf("chromedp run: %v", err)
+	}
+
+	if giteaDisplay != "none" {
+		t.Errorf("gitea card display = %q after searching 'paperless', want 'none'", giteaDisplay)
+	}
+}
+
+// TestE2EDashboardSortPill checks that clicking the Name sort pill reorders cards.
+func TestE2EDashboardSortPill(t *testing.T) {
+	srv := httptest.NewServer(newTestServer(t, sampleData(), sampleStats()))
+	defer srv.Close()
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.NoSandbox,
+	)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancelAlloc()
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+	ctx, cancelTimeout := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelTimeout()
+
+	var firstCardName string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(srv.URL+"/"),
+		chromedp.WaitVisible(`#sort-pills`, chromedp.ByQuery),
+		// Click the "Name" sort pill (ascending alphabetical).
+		chromedp.Click(`.sort-pill[data-sort="name"]`, chromedp.ByQuery),
+		// First card should be "gitea" (alphabetically before "paperless").
+		chromedp.Evaluate(`document.querySelector('#ns-grid .ns-card[data-name]').dataset.name`, &firstCardName),
+	)
+	if err != nil {
+		if isNoBrowser(err) {
+			t.Skipf("no Chrome/Chromium available for E2E: %v", err)
+		}
+		t.Fatalf("chromedp run: %v", err)
+	}
+
+	if firstCardName != "gitea" {
+		t.Errorf("first card after Name sort = %q, want 'gitea'", firstCardName)
 	}
 }
 

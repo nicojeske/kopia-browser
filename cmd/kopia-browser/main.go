@@ -7,6 +7,9 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	assets "github.com/nicojeske/kopia-browser"
 	"github.com/nicojeske/kopia-browser/internal/config"
@@ -24,14 +27,32 @@ func main() {
 	if err != nil {
 		log.Fatalf("kopia: %v", err)
 	}
+
+	// Background stats cache: refreshes periodically; handlers read from it
+	// without blocking on S3. Cancelled on shutdown so the goroutine exits.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cache := kopia.NewStatsCache(mgr, cfg.StatsRefreshInterval)
+	go cache.Run(ctx)
+
 	defer mgr.Close(context.Background())
 
-	srv, err := web.NewServer(cfg, mgr, assets.Templates(), assets.Static())
+	srv, err := web.NewServer(cfg, mgr, cache, assets.Templates(), assets.Static())
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
 
-	log.Printf("kopia-browser listening on %s", cfg.ListenAddr)
+	// Graceful shutdown on SIGINT / SIGTERM.
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		log.Println("kopia-browser: shutting down")
+		cancel()
+	}()
+
+	log.Printf("kopia-browser listening on %s (stats refresh every %s)", cfg.ListenAddr, cfg.StatsRefreshInterval)
 	if err := http.ListenAndServe(cfg.ListenAddr, srv); err != nil {
 		log.Fatalf("listen: %v", err)
 	}

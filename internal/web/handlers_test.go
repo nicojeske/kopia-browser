@@ -13,11 +13,14 @@ import (
 	"github.com/nicojeske/kopia-browser/internal/kopia"
 )
 
-// newTestServer builds the real handler against a fake data layer, using the
-// real embedded templates and static assets.
-func newTestServer(t *testing.T, b Backups) http.Handler {
+// newTestServer builds the real handler against fake data and stats layers,
+// using the real embedded templates and static assets.
+func newTestServer(t *testing.T, b Backups, st Stats) http.Handler {
 	t.Helper()
-	srv, err := NewServer(&config.Config{}, b, assets.Templates(), assets.Static())
+	if st == nil {
+		st = fakeStats{}
+	}
+	srv, err := NewServer(&config.Config{}, b, st, assets.Templates(), assets.Static())
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
@@ -77,6 +80,7 @@ func TestHandlers(t *testing.T) {
 		target      string
 		headers     map[string]string
 		backups     Backups
+		stats       Stats // nil → fakeStats{} (not-ready)
 		wantStatus  int
 		wantContain []string
 		wantAbsent  []string
@@ -86,8 +90,41 @@ func TestHandlers(t *testing.T) {
 			name:        "index lists namespaces",
 			target:      "/",
 			backups:     sampleData(),
+			stats:       sampleStats(),
 			wantStatus:  http.StatusOK,
 			wantContain: []string{`href="/repo/paperless"`, `href="/repo/gitea"`, "Namespaces"},
+		},
+		{
+			name:        "index shows stat cards with counts",
+			target:      "/",
+			backups:     sampleData(),
+			stats:       sampleStats(),
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"Namespaces", "Total snapshots", "Stored", "Last backup"},
+		},
+		{
+			name:        "index namespace card has per-ns stats",
+			target:      "/",
+			backups:     sampleData(),
+			stats:       sampleStats(),
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"paperless", "volumes", "snapshots", "stored", "size-bar"},
+		},
+		{
+			name:        "index stats not ready shows calculating note",
+			target:      "/",
+			backups:     sampleData(),
+			stats:       fakeStats{}, // not ready
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"calculating"},
+		},
+		{
+			name:        "index sidebar shows snapshot count",
+			target:      "/",
+			backups:     sampleData(),
+			stats:       sampleStats(),
+			wantStatus:  http.StatusOK,
+			wantContain: []string{"sidebar-item", "item-snap-count"},
 		},
 		{
 			name:        "volumes page lists volume names, no source path",
@@ -254,7 +291,7 @@ func TestHandlers(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := newTestServer(t, tc.backups)
+			srv := newTestServer(t, tc.backups, tc.stats)
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, tc.target, nil)
 			for k, v := range tc.headers {
@@ -315,7 +352,7 @@ func TestCleanBrowsePath(t *testing.T) {
 }
 
 func TestStaticServed(t *testing.T) {
-	srv := newTestServer(t, sampleData())
+	srv := newTestServer(t, sampleData(), sampleStats())
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/htmx.min.js", nil))
 	if rec.Code != http.StatusOK {

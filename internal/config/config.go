@@ -7,21 +7,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 // Config holds all runtime configuration. See CLAUDE.md for the env var list.
 type Config struct {
-	S3Endpoint        string
-	S3Region          string
-	S3Bucket          string
-	S3AccessKey       string
-	S3SecretKey       string
-	KopiaRepoPassword string
-	KopiaPrefix       string
-	KopiaCacheDir     string
-	ListenAddr        string
+	S3Endpoint           string
+	S3Region             string
+	S3Bucket             string
+	S3AccessKey          string
+	S3SecretKey          string
+	KopiaRepoPassword    string
+	KopiaPrefix          string
+	KopiaCacheDir        string
+	ListenAddr           string
+	StatsRefreshInterval time.Duration // how often the background stats cache refreshes
 }
 
 // Load reads configuration from the environment. In development a .env file in
@@ -34,16 +36,22 @@ func Load() (*Config, error) {
 	// real config comes from the environment in production.
 	_ = godotenv.Load()
 
+	refreshInterval, err := time.ParseDuration(getenv("STATS_REFRESH_INTERVAL", "15m"))
+	if err != nil {
+		refreshInterval = 15 * time.Minute
+	}
+
 	cfg := &Config{
-		S3Endpoint:        os.Getenv("S3_ENDPOINT"),
-		S3Region:          getenv("S3_REGION", "garage"),
-		S3Bucket:          getenv("S3_BUCKET", "velero-backup"),
-		S3AccessKey:       os.Getenv("S3_ACCESS_KEY"),
-		S3SecretKey:       os.Getenv("S3_SECRET_KEY"),
-		KopiaRepoPassword: os.Getenv("KOPIA_REPO_PASSWORD"),
-		KopiaPrefix:       getenv("KOPIA_PREFIX", "kopia/"),
-		KopiaCacheDir:     getenv("KOPIA_CACHE_DIR", ".kopia-cache"),
-		ListenAddr:        getenv("LISTEN_ADDR", ":8080"),
+		S3Endpoint:           os.Getenv("S3_ENDPOINT"),
+		S3Region:             getenv("S3_REGION", "garage"),
+		S3Bucket:             getenv("S3_BUCKET", "velero-backup"),
+		S3AccessKey:          os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:          os.Getenv("S3_SECRET_KEY"),
+		KopiaRepoPassword:    os.Getenv("KOPIA_REPO_PASSWORD"),
+		KopiaPrefix:          getenv("KOPIA_PREFIX", "kopia/"),
+		KopiaCacheDir:        getenv("KOPIA_CACHE_DIR", ".kopia-cache"),
+		ListenAddr:           getenv("LISTEN_ADDR", ":8080"),
+		StatsRefreshInterval: refreshInterval,
 	}
 
 	var missing []string

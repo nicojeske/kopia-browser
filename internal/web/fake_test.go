@@ -7,9 +7,33 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/nicojeske/kopia-browser/internal/kopia"
 )
+
+// fakeStats is an in-memory Stats implementation for handler + E2E tests.
+type fakeStats struct {
+	snap kopia.StatsSnapshot
+}
+
+func (f fakeStats) Get() kopia.StatsSnapshot { return f.snap }
+
+// sampleStats returns a ready StatsSnapshot consistent with sampleData().
+func sampleStats() fakeStats {
+	now := time.Date(2026, 6, 26, 1, 2, 3, 0, time.UTC)
+	return fakeStats{snap: kopia.StatsSnapshot{
+		Namespaces: []kopia.NamespaceStats{
+			{Name: "paperless", Volumes: 2, Snapshots: 2, SizeBytes: 4 * 1024 * 1024, LastBackup: now},
+			{Name: "gitea", Volumes: 0, Snapshots: 0, SizeBytes: 0},
+		},
+		TotalSize:      4 * 1024 * 1024,
+		TotalSnapshots: 2,
+		NamespaceCount: 2,
+		MaxSize:        4 * 1024 * 1024,
+		Ready:          true,
+	}}
+}
 
 // fakeBackups is an in-memory Backups implementation for handler + E2E tests.
 // It needs no S3 or kopia, so tests run offline and deterministically.

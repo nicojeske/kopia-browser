@@ -1,0 +1,172 @@
+package kopia
+
+import (
+	"context"
+	"log"
+	"sort"
+	"sync"
+	"time"
+)
+
+// NamespaceStats summarises the backup state of one namespace.
+// SizeBytes is the sum of each volume's newest snapshot's TotalSize — it is
+// a logical (non-deduplication-adjusted) approximation; see docs/KOPIA.md.
+type NamespaceStats struct {
+	Name       string
+	Volumes    int       // distinct volume count
+	Snapshots  int       // total snapshot count
+	SizeBytes  int64     // latest-per-volume TotalSize sum (logical; see note)
+	LastBackup time.Time // newest EndTime across all snapshots in this namespace
+}
+
+// StatsSnapshot is an immutable, point-in-time copy of computed dashboard
+// stats. Once obtained from StatsCache.Get it is safe to read without locks.
+type StatsSnapshot struct {
+	Namespaces     []NamespaceStats // sorted by SizeBytes descending
+	TotalSize      int64
+	TotalSnapshots int
+	NamespaceCount int
+	MaxSize        int64     // largest SizeBytes value (used for bar scaling)
+	UpdatedAt      time.Time
+	Ready          bool // false until the first successful refresh completes
+}
+
+// computeNamespaceStats derives NamespaceStats for one namespace from its
+// snapshot list. It is pure (no I/O) and directly unit-testable.
+// Size = sum of each distinct volume's newest-EndTime snapshot TotalSize.
+func computeNamespaceStats(name string, snaps []SnapshotInfo) NamespaceStats {
+	if len(snaps) == 0 {
+		return NamespaceStats{Name: name}
+	}
+
+	type volState struct {
+		latestEnd time.Time
+		size      int64
+	}
+	byVol := map[string]*volState{}
+	var lastBackup time.Time
+
+	for _, s := range snaps {
+		if s.EndTime.After(lastBackup) {
+			lastBackup = s.EndTime
+		}
+		vs, ok := byVol[s.Volume]
+		if !ok {
+			vs = &volState{}
+			byVol[s.Volume] = vs
+		}
+		if s.EndTime.After(vs.latestEnd) {
+			vs.latestEnd = s.EndTime
+			vs.size = s.TotalSize
+		}
+	}
+
+	var totalSize int64
+	for _, vs := range byVol {
+		totalSize += vs.size
+	}
+
+	return NamespaceStats{
+		Name:       name,
+		Volumes:    len(byVol),
+		Snapshots:  len(snaps),
+		SizeBytes:  totalSize,
+		LastBackup: lastBackup,
+	}
+}
+
+// StatsCache holds the latest computed StatsSnapshot and refreshes it
+// periodically by calling the Manager. Safe for concurrent use.
+type StatsCache struct {
+	mgr      *Manager
+	interval time.Duration
+
+	mu  sync.RWMutex
+	cur StatsSnapshot
+}
+
+// NewStatsCache creates a StatsCache that refreshes on the given interval.
+// Call Run(ctx) in a goroutine to start background refreshes.
+func NewStatsCache(mgr *Manager, interval time.Duration) *StatsCache {
+	return &StatsCache{mgr: mgr, interval: interval}
+}
+
+// Get returns a copy of the latest StatsSnapshot. Safe for concurrent calls.
+func (c *StatsCache) Get() StatsSnapshot {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.cur
+}
+
+// Run performs an immediate refresh, then repeats every interval.
+// Exits when ctx is cancelled (e.g. on server shutdown).
+func (c *StatsCache) Run(ctx context.Context) {
+	c.refresh(ctx)
+
+	ticker := time.NewTicker(c.interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.refresh(ctx)
+		}
+	}
+}
+
+// refresh rebuilds the snapshot from the Manager. Per-namespace errors are
+// logged and skipped so one unavailable repo doesn't blank the whole dashboard.
+func (c *StatsCache) refresh(ctx context.Context) {
+	if ctx.Err() != nil {
+		return // already cancelled; don't bother
+	}
+
+	namespaces, err := c.mgr.ListNamespaces(ctx)
+	if err != nil {
+		log.Printf("stats: ListNamespaces: %v", err)
+		return
+	}
+
+	nsList := make([]NamespaceStats, 0, len(namespaces))
+	var totalSize int64
+	var totalSnaps int
+
+	for _, ns := range namespaces {
+		snaps, err := c.mgr.ListSnapshots(ctx, ns)
+		if err != nil {
+			log.Printf("stats: ListSnapshots(%q): %v — skipping", ns, err)
+			continue
+		}
+		st := computeNamespaceStats(ns, snaps)
+		nsList = append(nsList, st)
+		totalSize += st.SizeBytes
+		totalSnaps += st.Snapshots
+	}
+
+	// Sort descending by SizeBytes; largest namespace drives MaxSize for bars.
+	sort.Slice(nsList, func(i, j int) bool {
+		return nsList[i].SizeBytes > nsList[j].SizeBytes
+	})
+
+	var maxSize int64
+	if len(nsList) > 0 {
+		maxSize = nsList[0].SizeBytes
+	}
+
+	snap := StatsSnapshot{
+		Namespaces:     nsList,
+		TotalSize:      totalSize,
+		TotalSnapshots: totalSnaps,
+		NamespaceCount: len(namespaces),
+		MaxSize:        maxSize,
+		UpdatedAt:      time.Now(),
+		Ready:          true,
+	}
+
+	c.mu.Lock()
+	c.cur = snap
+	c.mu.Unlock()
+
+	log.Printf("stats: refresh done — %d namespaces, %d snapshots", len(namespaces), totalSnaps)
+}
