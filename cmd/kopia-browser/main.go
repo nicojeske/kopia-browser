@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	assets "github.com/nicojeske/kopia-browser"
 	"github.com/nicojeske/kopia-browser/internal/config"
@@ -38,10 +39,12 @@ func main() {
 
 	defer mgr.Close(context.Background())
 
-	srv, err := web.NewServer(cfg, mgr, cache, assets.Templates(), assets.Static())
+	handler, err := web.NewServer(cfg, mgr, cache, assets.Templates(), assets.Static())
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
+
+	httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: handler}
 
 	// Graceful shutdown on SIGINT / SIGTERM.
 	go func() {
@@ -50,10 +53,15 @@ func main() {
 		<-quit
 		log.Println("kopia-browser: shutting down")
 		cancel()
+		shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutCancel()
+		if err := httpSrv.Shutdown(shutCtx); err != nil {
+			log.Printf("shutdown: %v", err)
+		}
 	}()
 
 	log.Printf("kopia-browser listening on %s (stats refresh every %s)", cfg.ListenAddr, cfg.StatsRefreshInterval)
-	if err := http.ListenAndServe(cfg.ListenAddr, srv); err != nil {
+	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("listen: %v", err)
 	}
 }

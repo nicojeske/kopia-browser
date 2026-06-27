@@ -31,7 +31,7 @@ Loads env vars (see CLAUDE.md), validates required ones, loads `.env` in dev. Re
 
 ### internal/kopia — StatsCache
 
-`StatsCache` runs in the background and periodically (every `STATS_REFRESH_INTERVAL`, default 15m) calls `ListNamespaces` + `ListSnapshots` per namespace to compute `StatsSnapshot`:
+`StatsCache` runs in the background and periodically (every `STATS_REFRESH_INTERVAL`, default 60m) calls `ListNamespaces` + `ListSnapshots` per namespace to compute `StatsSnapshot`:
 - `NamespaceStats` per ns: volume count, snapshot count, total size (latest-per-volume), last backup time.
 - Aggregate totals: `TotalSize`, `TotalSnapshots`, `NamespaceCount`, `MaxSize` (for bar scaling).
 - `Ready bool` — false until the first refresh completes; handlers render "calculating" placeholders meanwhile.

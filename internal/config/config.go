@@ -37,9 +37,9 @@ func Load() (*Config, error) {
 	// real config comes from the environment in production.
 	_ = godotenv.Load()
 
-	refreshInterval, err := time.ParseDuration(getenv("STATS_REFRESH_INTERVAL", "15m"))
+	refreshInterval, err := time.ParseDuration(getenv("STATS_REFRESH_INTERVAL", "60m"))
 	if err != nil {
-		refreshInterval = 15 * time.Minute
+		refreshInterval = 60 * time.Minute
 	}
 
 	cfg := &Config{
