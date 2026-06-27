@@ -20,7 +20,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M3 Download single file | DONE |
 | M4 Download folder (tar) | DONE |
 | M5 UI refinement & E2E hardening | DONE |
-| M6 Docker + k8s | TODO |
+| M6 Docker + k8s | DONE |
 | M7 Dashboard stats & enriched sidebar | DONE |
 
 Statuses: `TODO` → `IN PROGRESS` → `DONE`.
@@ -107,9 +107,9 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - [x] Tests: `fakeStats`/`sampleStats()` in `fake_test.go`; 5 new handler assertions; 2 new E2E tests (dashboard search + sort pill).
 - **Verify:** `go test ./...` ✅, `go test -tags=e2e ./internal/web` ✅ (7 E2E), kapture visual pass (see JOURNAL.md).
 
-### M6 — Docker — `TODO`
-- [ ] Multi-stage `Dockerfile` (distroless/scratch)
-- **Verify:** image runs locally with env.
+### M6 — Docker — `DONE`
+- [x] Multi-stage `Dockerfile` (distroless/scratch)
+- **Verify:** ✅ `docker build -t kopia-browser .`; `docker run --env-file .env` boots + serves `/healthz` → `ok`.
 
 ## Out of scope
 - In-app auth (handled by SSO reverse proxy)

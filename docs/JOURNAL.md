@@ -2,6 +2,13 @@
 > Append a short entry at the end of every working session so the next session resumes cleanly.
 > Newest at top. Format: date — what was done / what's next / blockers.
 
+## 2026-06-27 — M6 Docker (DONE)
+
+- **Done:** Multi-stage `Dockerfile` + `.dockerignore`. Builder: `golang:1.26`, `CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w"` → static binary at `/out/kopia-browser`. Runtime: `gcr.io/distroless/static-debian12:nonroot` (CA certs, no shell, uid 65532). Cache dir created in builder + `COPY --chown=65532:65532` into `/var/cache/kopia-browser` (distroless has no shell/mkdir). `ENV KOPIA_CACHE_DIR=/var/cache/kopia-browser` so it resolves absolute (required per manager.go). `EXPOSE 8080`, `USER nonroot`, `VOLUME ["/var/cache/kopia-browser"]`, `ENTRYPOINT ["/usr/local/bin/kopia-browser"]`. `.dockerignore` excludes `.git/`, `.env*`, `bin/`, `docs/`, `*.md`, `Makefile`; keeps `web/` for go:embed. Docs: PLAN.md M6 → DONE, DECISIONS.md M6 entry added.
+- **Verified:** `make test` ✅ (all existing tests unaffected). Image build requires Docker — user verifies via `make docker` + `docker run --env-file .env`.
+- **Next:** All milestones DONE (M0–M7 + M6). Project feature-complete.
+- **Blockers:** none.
+
 ## 2026-06-27 — Fix snapshot ordering + file-count bugs (DONE)
 
 - **Done:** Three bugs in `internal/kopia/manager.go::ListSnapshots`, all found and fixed in one edit. (1) Sort result discarded — `snapshot.SortByTime` returns a new slice; assigned the result (`mans = snapshot.SortByTime(mans, true)`). (2) "Latest" stat showed earliest snapshot — consequence of bug 1; fixed by same assignment. (3) File count too low on incremental snapshots — `man.Stats.TotalFileCount` is the per-run upload tally; unchanged cached subtrees never walked, so they're excluded. Switched to `man.RootEntry.DirSummary.TotalFileCount` / `TotalFileSize` (full-tree totals, same source as browse folder sizes) with a `Stats` fallback for nil `RootEntry`. Updated `docs/KOPIA.md` §Go library notes + §Stats to document both gotchas.

@@ -2,6 +2,15 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-06-27 — M6 Docker image decisions
+
+- **`gcr.io/distroless/static-debian12:nonroot` as runtime base.** PLAN.md listed "distroless/scratch". `scratch` has no CA bundle, which matters for kopia/minio TLS S3 connections. `distroless/static-debian12` bundles CA certs + `/etc/passwd` (needed for UID lookup) and still has no shell. The `:nonroot` tag fixes uid 65532 (`nonroot`) as the default user — image runs unprivileged without an explicit `USER` override, though the Dockerfile states it explicitly for clarity.
+- **`CGO_ENABLED=0` — static binary.** kopia v0.22.3 + minio-go have no CGO requirements in this project's dependency graph (no sqlite3, no htmldoc). `CGO_ENABLED=0` produces a fully-static binary that runs on `distroless/static` (no glibc) with zero shared-library issues.
+- **Cache dir created in builder stage, `COPY --chown` into final image.** `distroless` has no shell or `mkdir`. Creating the empty dir in the builder stage and using `COPY --from=builder --chown=65532:65532` lets us set correct ownership without needing `RUN` in the final stage.
+- **`KOPIA_CACHE_DIR=/var/cache/kopia-browser` as container default.** `manager.go` resolves the env var via `filepath.Abs`, so it must be absolute in the container (relative would resolve against the working directory, which is `/` in distroless). The env var remains overridable at runtime (e.g. `-e KOPIA_CACHE_DIR=/data` for a differently-mounted volume).
+- **No in-image `HEALTHCHECK`.** `distroless` has no shell, curl, or wget, so a `HEALTHCHECK CMD curl ...` would fail. The app exposes `GET /healthz → "ok"` (200) which k8s liveness/readiness probes can hit directly.
+- **`VOLUME ["/var/cache/kopia-browser"]` declared.** Declares intent; orchestrators can mount persistent storage here to preserve per-namespace repo config + `stats-cache.json` across pod restarts. The image works without a mount (ephemeral cache; cold reconnect on restart).
+
 ## 2026-06-27 — Progress logging + log levels
 
 - **`log/slog` over stdlib `log` + manual level gate.** The app had ~20 flat `log.Printf` call sites with no level concept. Migrated all to `log/slog` (stdlib since Go 1.21). `slog.SetDefault` in `main()` sets a text handler gated on `cfg.LogLevel`. Rationale: native levels (Debug/Info/Warn/Error), structured key=val fields, zero dependency, idiomatic Go 1.26. A manual gate (retain `log`, add an `if level >= X` wrapper) would reinvent what `slog` provides, and a third-party logger (zap/logrus) is over-engineering for this project's scale.

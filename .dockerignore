@@ -1,0 +1,15 @@
+# Keep build context small and avoid leaking secrets / dev artefacts.
+# web/ is intentionally NOT excluded — go:embed needs it at compile time.
+
+.git/
+.gitignore
+.env
+.env.*
+bin/
+dist/
+.kopia-cache/
+cache/
+docs/
+*.md
+Makefile
+.claude/
