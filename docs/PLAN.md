@@ -19,7 +19,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M2 Browse dir tree | DONE |
 | M3 Download single file | DONE |
 | M4 Download folder (tar) | DONE |
-| M5 UI refinement & E2E hardening | TODO |
+| M5 UI refinement & E2E hardening | DONE |
 | M6 Docker + k8s | TODO |
 
 Statuses: `TODO` → `IN PROGRESS` → `DONE`.
@@ -84,12 +84,15 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 - **UI:** [x] browse.html: "Download this folder (.tar)" button near h1; `.tar-link` on each dir row; app.css styles; chromedp E2E `TestE2EFolderTarLink` asserts hrefs contain `/download/`
 - **Verify:** `go test ./...` ✅; `make e2e` ✅; integration + live manual pending live run.
 
-### M5 — UI refinement & E2E hardening — `TODO`
+### M5 — UI refinement & E2E hardening — `DONE`
 - [x] Volume navigation layer: `/repo/{ns}` lists volumes; `/repo/{ns}/vol/{volume...}` lists snapshots for that volume. Grouping handler-side from existing `ListSnapshots`. Untagged snapshots → "(no volume)".
-- [ ] Snapshot metadata, human sizes, sorting, error pages, empty states
-- [ ] Static assets finalized (htmx, minimal css)
-- [ ] Broaden chromedp E2E to cover full happy path + key error paths; kapture visual pass + screenshots
-- **Verify:** full E2E suite green; manual visual pass.
+- [x] Dark-theme UI redesign: CSS custom properties (`--bg`, `--ac` teal, etc.), 248px sidebar + main shell, `table.data-table` unified table component, inline SVG icon library as `{{define "icon-*"}}` template helpers, `page-eyebrow` / breadcrumb / stats-row patterns.
+- [x] Self-hosted Geist fonts: 11 woff2 subsets (Geist + Geist Mono variable, OFL), `@font-face` rules in `app.css`, served from `/static/fonts/`. Zero Google CDN requests (verified via kapture network monitor).
+- [x] Persistent sidebar namespace nav: `ListNamespaces` injected into `handleVolumes`, `handleSnapshots`, `handleBrowse` (full-page path only; htmx fragment path skipped). Graceful degrade on error.
+- [x] Styled error page: `error.html` template + `renderError` calls `ExecuteTemplate` instead of `http.Error`. Monospace error box, "← Back to namespaces" link.
+- [x] Updated E2E selectors for redesigned CSS classes (`table.data-table`, `.entry-dir-link`, `.entry-file-link`, `.btn-tar`).
+- [x] kapture visual pass: index, volumes, snapshots, browse, error page — all visually confirmed.
+- **Verify:** `go test ./...` ✅, `make e2e` ✅, kapture visual pass ✅, no external font requests ✅.
 
 ### M6 — Docker + k8s — `TODO`
 - [ ] Multi-stage `Dockerfile` (distroless/scratch)

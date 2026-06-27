@@ -18,8 +18,9 @@ cmd/kopia-browser/main.go   entrypoint: load config, build RepoManager, start se
 internal/config/            env + .env loader and validation
 internal/kopia/             RepoManager — all kopia interaction (read-only)
 internal/web/               http handlers, routing, template rendering
-web/templates/              html/template files + htmx partials
-web/static/                 htmx.min.js, minimal css
+web/templates/              html/template files + htmx partials (incl. error.html)
+web/static/                 htmx.min.js, app.css (dark theme, CSS vars)
+web/static/fonts/           self-hosted Geist + Geist Mono woff2 (OFL; embedded in binary)
 docs/                       this documentation
 ```
 
@@ -53,7 +54,7 @@ Routes:
 | `GET /repo/{ns}/snap/{id}/download/{path...}` | stream file, or tar if path is a directory |
 | `GET /healthz` | liveness |
 
-UI: server-rendered `html/template`; htmx swaps directory listings without full page reloads.
+UI: server-rendered `html/template`; htmx swaps directory listings without full page reloads. Dark-theme shell: 248px sidebar (persistent namespace list, active highlight) + main column; CSS custom properties; self-hosted Geist fonts. Error responses rendered via `error.html` template (styled, monospace error box) rather than plain `http.Error`.
 
 ## Data flow: browse
 1. Handler parses `ns`, `snapID`, `path`.
