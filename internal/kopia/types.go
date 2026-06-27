@@ -26,6 +26,6 @@ type SnapshotInfo struct {
 type DirEntry struct {
 	Name    string
 	IsDir   bool
-	Size    int64     // bytes; 0 for directories
+	Size    int64     // bytes; for directories, recursive total from kopia DirectorySummary (stored in manifest, no extra I/O)
 	ModTime time.Time
 }

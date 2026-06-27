@@ -58,7 +58,7 @@ func sampleData() fakeBackups {
 		},
 		dirs: map[string][]kopia.DirEntry{
 			"snap-1|": {
-				{Name: "data", IsDir: true, ModTime: now},
+				{Name: "data", IsDir: true, Size: 2*1024*1024, ModTime: now},
 				{Name: "logs", IsDir: true, ModTime: now},
 				{Name: "config.yaml", IsDir: false, Size: 1024, ModTime: now},
 			},
@@ -178,6 +178,7 @@ func TestHandlers(t *testing.T) {
 				"data", "logs", "config.yaml",
 				"Namespaces", // breadcrumb root link
 				"paperless",  // breadcrumb ns link
+				"2.0 MiB",    // directory recursive size shown (data dir)
 			},
 			wantAbsent: []string{uglySourcePath, "host_pods"},
 		},

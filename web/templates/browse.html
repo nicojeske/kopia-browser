@@ -50,7 +50,7 @@
                hx-push-url="true">{{.Name}}/</a>
           </div>
         </td>
-        <td class=”cell-dim col-r”>—</td>
+        <td class=”cell-num col-r”>{{humanBytes .Size}}</td>
         <td class="cell-num col-r">{{humanTime .ModTime}}</td>
         <td class="col-r" style="padding:11px 14px">
           <a class="btn-tar"
