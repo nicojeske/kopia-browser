@@ -2,6 +2,12 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-06-27 — Progress logging + log levels
+
+- **`log/slog` over stdlib `log` + manual level gate.** The app had ~20 flat `log.Printf` call sites with no level concept. Migrated all to `log/slog` (stdlib since Go 1.21). `slog.SetDefault` in `main()` sets a text handler gated on `cfg.LogLevel`. Rationale: native levels (Debug/Info/Warn/Error), structured key=val fields, zero dependency, idiomatic Go 1.26. A manual gate (retain `log`, add an `if level >= X` wrapper) would reinvent what `slog` provides, and a third-party logger (zap/logrus) is over-engineering for this project's scale.
+- **Text handler only (not JSON).** k8s log infrastructure (Loki, journald) handles plain text fine. A `LOG_FORMAT` toggle was considered and rejected — two formats to test, no concrete need, easy to add later if a structured consumer appears.
+- **Info-level per-namespace progress lines.** The cache refresh iterates ~30 namespaces, each doing S3 I/O. Progress lines (`stats: processing namespace i=N n=30 ns=foo`) are emitted at `slog.Info` so operators see them by default without setting `LOG_LEVEL=debug`. Per-namespace snapshot count is at `slog.Debug` (too noisy for default). Refresh duration is included in the "done" summary line for easy performance monitoring.
+
 ## 2026-06-27 — M7 Dashboard stats & enriched sidebar decisions
 
 - **Background stats cache (eventual freshness).** Opening 29 kopia repos cold + loading their snapshot manifests takes O(seconds–minutes) at first run. Computing this synchronously on every dashboard load would be unacceptably slow. `StatsCache` (new `internal/kopia/stats.go`) runs a goroutine that refreshes on a configurable interval (`STATS_REFRESH_INTERVAL`, default 15m). Handlers call `cache.Get()` (cheap RLock) and get whatever the last refresh produced. The first page load before the first refresh completes shows "—" placeholders + a "Statistics are being calculated…" banner (the `NotReady` flag). After the first refresh, the dashboard shows live per-namespace stats without any request latency.

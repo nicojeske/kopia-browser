@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -138,9 +138,11 @@ func (m *Manager) open(ctx context.Context, ns string) (repo.Repository, error) 
 	defer m.mu.Unlock()
 
 	if rep, ok := m.repos[ns]; ok {
+		slog.Debug("kopia: repo cache hit", "ns", ns)
 		return rep, nil
 	}
 
+	slog.Debug("kopia: opening repo", "ns", ns)
 	st, err := s3.New(ctx, &s3.Options{
 		BucketName:      m.cfg.S3Bucket,
 		Endpoint:        m.cfg.S3Endpoint,
@@ -333,7 +335,7 @@ func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, pr
 		case kopiafs.Symlink:
 			link, err := v.Readlink(ctx)
 			if err != nil {
-				log.Printf("kopia/tar: readlink %q: %v; skipping", name, err)
+				slog.Warn("kopia/tar: readlink failed, skipping", "name", name, "err", err)
 				return nil
 			}
 			hdr := &tar.Header{
@@ -350,7 +352,7 @@ func writeTarTree(ctx context.Context, tw *tar.Writer, dir kopiafs.Directory, pr
 
 		default:
 			// StreamingFile and other unknown types are uncommon in volume backups.
-			log.Printf("kopia/tar: skipping entry %q (type %T)", name, e)
+			slog.Warn("kopia/tar: skipping unknown entry type", "name", name, "type", fmt.Sprintf("%T", e))
 			return nil
 		}
 	})

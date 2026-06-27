@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ type Config struct {
 	ListenAddr           string
 	StatsRefreshInterval time.Duration // how often the background stats cache refreshes
 	StatsCacheFile       string        // path to persist stats snapshot across restarts; "" disables
+	LogLevel             slog.Level    // minimum log level; controlled by LOG_LEVEL env var (default info)
 }
 
 // Load reads configuration from the environment. In development a .env file in
@@ -43,6 +45,7 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
+		LogLevel: parseLevel(getenv("LOG_LEVEL", "info")),
 		S3Endpoint:           os.Getenv("S3_ENDPOINT"),
 		S3Region:             getenv("S3_REGION", "garage"),
 		S3Bucket:             getenv("S3_BUCKET", "velero-backup"),
@@ -84,4 +87,21 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// parseLevel maps a LOG_LEVEL string to a slog.Level. Unknown values fall back
+// to LevelInfo so a bad env var doesn't crash the process.
+func parseLevel(s string) slog.Level {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

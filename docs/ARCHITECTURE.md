@@ -36,6 +36,8 @@ Loads env vars (see CLAUDE.md), validates required ones, loads `.env` in dev. Re
 - Aggregate totals: `TotalSize`, `TotalSnapshots`, `NamespaceCount`, `MaxSize` (for bar scaling).
 - `Ready bool` — false until the first refresh completes; handlers render "calculating" placeholders meanwhile.
 
+Logging: each refresh emits `slog.Info` lines — one at start (namespace count), one per namespace (`i/n` progress), one at completion (duration). Per-namespace snapshot count is at `slog.Debug` level. Log level controlled by `LOG_LEVEL` env var (default `info`); all logging uses `log/slog` with a text handler.
+
 Handlers call `cache.Get()` (sync, RWMutex RLock) to get a copy of the last snapshot. The `Manager` is concurrency-safe so the background goroutine and live request handlers share it without issue.
 
 ### internal/kopia — RepoManager

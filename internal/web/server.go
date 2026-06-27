@@ -11,7 +11,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -271,7 +271,7 @@ func (s *server) handleVolumes(w http.ResponseWriter, r *http.Request) {
 
 	nsList, nsErr := s.backups.ListNamespaces(r.Context())
 	if nsErr != nil {
-		log.Printf("handleVolumes: listing namespaces for sidebar: %v", nsErr)
+		slog.Warn("handleVolumes: listing namespaces for sidebar failed", "err", nsErr)
 		nsList = nil
 	}
 
@@ -309,7 +309,7 @@ func (s *server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 
 	nsList, nsErr := s.backups.ListNamespaces(r.Context())
 	if nsErr != nil {
-		log.Printf("handleSnapshots: listing namespaces for sidebar: %v", nsErr)
+		slog.Warn("handleSnapshots: listing namespaces for sidebar failed", "err", nsErr)
 		nsList = nil
 	}
 
@@ -407,7 +407,7 @@ func (s *server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 
 	nsList, nsErr := s.backups.ListNamespaces(r.Context())
 	if nsErr != nil {
-		log.Printf("handleBrowse: listing namespaces for sidebar: %v", nsErr)
+		slog.Warn("handleBrowse: listing namespaces for sidebar failed", "err", nsErr)
 	}
 	s.injectSidebarData(data, nsList, ns)
 	s.render(w, "browse.html", data)
@@ -441,7 +441,7 @@ func (s *server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-tar")
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, tarName))
 		if terr := s.backups.TarDir(r.Context(), ns, snapID, cleanPath, w); terr != nil {
-			log.Printf("handleDownload: tar %s/%s/%s: %v", ns, snapID, cleanPath, terr)
+			slog.Error("handleDownload: tar streaming failed", "ns", ns, "snap", snapID, "path", cleanPath, "err", terr)
 		}
 
 	case errors.Is(fileErr, kopia.ErrNotFound):
@@ -537,7 +537,7 @@ func (s *server) renderError(w http.ResponseWriter, code int, what string, err e
 		"Code":    code,
 		"Message": msg,
 	}); terr != nil {
-		log.Printf("renderError: template execute: %v", terr)
+		slog.Error("renderError: template execute failed", "err", terr)
 	}
 }
 

@@ -44,4 +44,4 @@ Equivalent raw commands work too (e.g. `go run ./cmd/kopia-browser`) if `make` i
 
 ## Environment variables
 
-`S3_ENDPOINT`, `S3_REGION` (=`garage`), `S3_BUCKET` (=`velero-backup`), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `KOPIA_REPO_PASSWORD`, `KOPIA_PREFIX` (=`kopia/`), `LISTEN_ADDR` (=`:8080`).
+`S3_ENDPOINT`, `S3_REGION` (=`garage`), `S3_BUCKET` (=`velero-backup`), `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `KOPIA_REPO_PASSWORD`, `KOPIA_PREFIX` (=`kopia/`), `LISTEN_ADDR` (=`:8080`), `LOG_LEVEL` (=`info`; one of `debug|info|warn|error`), `STATS_REFRESH_INTERVAL` (=`60m`), `KOPIA_CACHE_DIR` (=`.kopia-cache`).

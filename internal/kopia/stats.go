@@ -3,7 +3,7 @@ package kopia
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -132,22 +132,28 @@ func (c *StatsCache) refresh(ctx context.Context) {
 		return // already cancelled; don't bother
 	}
 
+	start := time.Now()
+
 	namespaces, err := c.mgr.ListNamespaces(ctx)
 	if err != nil {
-		log.Printf("stats: ListNamespaces: %v", err)
+		slog.Error("stats: list namespaces failed", "err", err)
 		return
 	}
+
+	slog.Info("stats: refresh starting", "namespaces", len(namespaces))
 
 	nsList := make([]NamespaceStats, 0, len(namespaces))
 	var totalSize int64
 	var totalSnaps int
 
-	for _, ns := range namespaces {
+	for i, ns := range namespaces {
+		slog.Info("stats: processing namespace", "i", i+1, "n", len(namespaces), "ns", ns)
 		snaps, err := c.mgr.ListSnapshots(ctx, ns)
 		if err != nil {
-			log.Printf("stats: ListSnapshots(%q): %v — skipping", ns, err)
+			slog.Warn("stats: list snapshots failed, skipping", "ns", ns, "err", err)
 			continue
 		}
+		slog.Debug("stats: namespace done", "ns", ns, "snapshots", len(snaps))
 		st := computeNamespaceStats(ns, snaps)
 		nsList = append(nsList, st)
 		totalSize += st.SizeBytes
@@ -178,7 +184,7 @@ func (c *StatsCache) refresh(ctx context.Context) {
 	c.cur = snap
 	c.mu.Unlock()
 
-	log.Printf("stats: refresh done — %d namespaces, %d snapshots", len(namespaces), totalSnaps)
+	slog.Info("stats: refresh done", "namespaces", len(namespaces), "snapshots", totalSnaps, "duration", time.Since(start).Round(time.Millisecond))
 
 	if c.persistPath != "" {
 		c.save(snap)
@@ -191,38 +197,38 @@ func (c *StatsCache) load() {
 	data, err := os.ReadFile(c.persistPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Printf("stats: load %q: %v", c.persistPath, err)
+			slog.Warn("stats: load cache file failed", "path", c.persistPath, "err", err)
 		}
 		return
 	}
 	var snap StatsSnapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
-		log.Printf("stats: load %q: %v", c.persistPath, err)
+		slog.Warn("stats: cache file corrupt, ignoring", "path", c.persistPath, "err", err)
 		return
 	}
 	c.mu.Lock()
 	c.cur = snap
 	c.mu.Unlock()
-	log.Printf("stats: loaded cached snapshot from %s (age %s)", c.persistPath, time.Since(snap.UpdatedAt).Round(time.Second))
+	slog.Info("stats: loaded cached snapshot", "path", c.persistPath, "age", time.Since(snap.UpdatedAt).Round(time.Second))
 }
 
 // save writes snap to persistPath atomically (write-then-rename).
 func (c *StatsCache) save(snap StatsSnapshot) {
 	data, err := json.Marshal(snap)
 	if err != nil {
-		log.Printf("stats: save marshal: %v", err)
+		slog.Error("stats: save marshal failed", "err", err)
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(c.persistPath), 0o755); err != nil {
-		log.Printf("stats: save mkdir: %v", err)
+		slog.Error("stats: save mkdir failed", "path", c.persistPath, "err", err)
 		return
 	}
 	tmp := c.persistPath + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		log.Printf("stats: save write: %v", err)
+		slog.Error("stats: save write failed", "path", tmp, "err", err)
 		return
 	}
 	if err := os.Rename(tmp, c.persistPath); err != nil {
-		log.Printf("stats: save rename: %v", err)
+		slog.Error("stats: save rename failed", "src", tmp, "dst", c.persistPath, "err", err)
 	}
 }
