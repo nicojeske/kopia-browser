@@ -97,12 +97,26 @@
 <script>
 (function(){
   var si = document.getElementById('side-search');
-  if (!si) return;
-  si.addEventListener('input', function(){
-    var q = this.value.toLowerCase();
-    var items = document.querySelectorAll('#sidebar-nav .sidebar-item[data-name]');
-    items.forEach(function(el){
-      el.style.display = !q || el.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+  if (si) {
+    si.addEventListener('input', function(){
+      var q = this.value.toLowerCase();
+      var items = document.querySelectorAll('#sidebar-nav .sidebar-item[data-name]');
+      items.forEach(function(el){
+        el.style.display = !q || el.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+
+  // Click-to-copy for elements with data-copy attribute (e.g. snapshot ID chips).
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('[data-copy]');
+    if (!el) return;
+    var text = el.dataset.copy;
+    if (!text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function(){
+      var prev = el.textContent;
+      el.textContent = 'Copied!';
+      setTimeout(function(){ el.textContent = prev; }, 1200);
     });
   });
 })();
@@ -296,5 +310,11 @@
 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
   <circle cx="12" cy="12" r="8"/>
   <path d="M12 8.2v4l2.8 1.8"/>
+</svg>
+{{end}}
+
+{{define "icon-pin"}}
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 17v5M9 9l-.7-4.3a1 1 0 0 1 .98-1.2h5.44a1 1 0 0 1 .98 1.2L15 9M5 9h14l-1 8H6Z"/>
 </svg>
 {{end}}

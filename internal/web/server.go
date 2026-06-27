@@ -549,6 +549,12 @@ var templateFuncs = template.FuncMap{
 	"humanCount":    humanCount,
 	"urlPathEscape": url.PathEscape,
 	"fileCategory":  fileCategory,
+	"sliceStr":      func(s string, n int) string { // sliceStr returns the first n runes of s
+		if len(s) <= n {
+			return s
+		}
+		return s[:n]
+	},
 }
 
 // fileCategory maps a filename to a display category string used to select

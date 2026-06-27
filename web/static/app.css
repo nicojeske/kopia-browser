@@ -484,9 +484,38 @@ h1.mono { font-family: 'Geist Mono', ui-monospace, monospace; }
   font-family: 'Geist Mono', ui-monospace, monospace;
   font-size: 11px;
   color: var(--tx3);
-  margin-top: 2px;
+  margin-top: 3px;
+  cursor: pointer;
+  display: inline-block;
+  transition: color .12s;
 }
+.snap-id:hover { color: var(--tx2); }
 .snap-icon { color: var(--ac); display: flex; }
+
+/* ── Snapshot retention / pin / error badges ─── */
+.snap-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surf3);
+  color: var(--tx2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.snap-badge-pin {
+  background: transparent;
+  color: var(--tx3);
+  padding: 2px 3px;
+}
+.snap-badge-err {
+  background: rgba(220,38,38,.12);
+  color: #f87171;
+}
 
 /* ── Download button (keep class for test assertions) ── */
 .btn-download-folder {

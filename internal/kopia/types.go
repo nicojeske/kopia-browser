@@ -18,7 +18,10 @@ type SnapshotInfo struct {
 	EndTime    time.Time         // snapshot end
 	TotalSize  int64             // total file bytes (Stats.TotalFileSize)
 	FileCount  int64             // total files (Stats.TotalFileCount)
-	Tags       map[string]string // full Velero tag set (backup, ns, pod, volume, ...)
+	Tags           map[string]string // full Velero tag set (backup, ns, pod, volume, ...)
+	RetentionRoles []string          // deduplicated retention categories in canonical order (Latest, Hourly, Daily, Weekly, Monthly, Annual)
+	Pinned         bool              // true when man.Pins is non-empty (e.g. velero-pin)
+	ErrorCount     int32             // man.Stats.ErrorCount; non-zero means backup had errors
 }
 
 // DirEntry is a UI-facing view of one entry (file or directory) within a

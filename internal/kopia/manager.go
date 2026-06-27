@@ -129,14 +129,17 @@ func (m *Manager) ListSnapshots(ctx context.Context, ns string) ([]SnapshotInfo,
 		}
 
 		out = append(out, SnapshotInfo{
-			ID:         string(man.ID),
-			BackupName: man.Tags["backup"],
-			Volume:     volume,
-			StartTime:  man.StartTime.ToTime(),
-			EndTime:    man.EndTime.ToTime(),
-			TotalSize:  size,
-			FileCount:  count,
-			Tags:       man.Tags,
+			ID:             string(man.ID),
+			BackupName:     man.Tags["backup"],
+			Volume:         volume,
+			StartTime:      man.StartTime.ToTime(),
+			EndTime:        man.EndTime.ToTime(),
+			TotalSize:      size,
+			FileCount:      count,
+			Tags:           man.Tags,
+			RetentionRoles: retentionRoles(man.RetentionReasons),
+			Pinned:         len(man.Pins) > 0,
+			ErrorCount:     man.Stats.ErrorCount,
 		})
 	}
 	return out, nil
@@ -448,6 +451,37 @@ func (m *Manager) OpenFile(ctx context.Context, ns, snapID, path string) (io.Rea
 		ModTime: child.ModTime(),
 	}
 	return rc, entry, nil
+}
+
+// retentionRoles converts raw kopia retention-reason strings (e.g. "latest-4",
+// "monthly-2") into deduplicated, capitalised category names emitted in canonical
+// order: Latest, Hourly, Daily, Weekly, Monthly, Annual. Any unrecognised
+// category is appended after the canonical ones.
+func retentionRoles(reasons []string) []string {
+	canonicalOrder := []string{"latest", "hourly", "daily", "weekly", "monthly", "annual"}
+	seen := make(map[string]bool, len(reasons))
+	for _, r := range reasons {
+		// Each reason is "<category>-<n>"; strip the numeric suffix.
+		cat := r
+		if i := strings.LastIndex(r, "-"); i >= 0 {
+			cat = r[:i]
+		}
+		seen[strings.ToLower(cat)] = true
+	}
+	var out []string
+	for _, cat := range canonicalOrder {
+		if seen[cat] {
+			out = append(out, strings.ToUpper(cat[:1])+cat[1:])
+			delete(seen, cat)
+		}
+	}
+	// Append any unrecognised categories in sorted order.
+	var extra []string
+	for cat := range seen {
+		extra = append(extra, strings.ToUpper(cat[:1])+cat[1:])
+	}
+	sort.Strings(extra)
+	return append(out, extra...)
 }
 
 // Close closes every cached repository. Safe to call once at shutdown.

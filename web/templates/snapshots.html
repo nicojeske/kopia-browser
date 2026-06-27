@@ -48,12 +48,15 @@
           <div style="display:flex;align-items:center;gap:11px">
             <span class="snap-icon">{{template "icon-snapshot" .}}</span>
             <div>
-              <a href="/repo/{{$.Namespace}}/snap/{{.ID}}/browse/" class="snap-label">
-                {{if .BackupName}}{{.BackupName}}{{else}}{{.ID}}{{end}}
-              </a>
-              {{if .BackupName}}
-              <div class="snap-id">{{.ID}}</div>
-              {{end}}
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <a href="/repo/{{$.Namespace}}/snap/{{.ID}}/browse/" class="snap-label">
+                  {{if .BackupName}}{{.BackupName}}{{else}}{{humanTime .StartTime}}{{end}}
+                </a>
+                {{range .RetentionRoles}}<span class="snap-badge">{{.}}</span>{{end}}
+                {{if .Pinned}}<span class="snap-badge snap-badge-pin">{{template "icon-pin" .}}</span>{{end}}
+                {{if gt .ErrorCount 0}}<span class="snap-badge snap-badge-err">{{.ErrorCount}} err</span>{{end}}
+              </div>
+              <div class="snap-id" data-copy="{{.ID}}" title="Click to copy full ID">{{sliceStr .ID 8}}&hellip;</div>
             </div>
           </div>
         </td>
