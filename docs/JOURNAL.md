@@ -2,6 +2,14 @@
 > Append a short entry at the end of every working session so the next session resumes cleanly.
 > Newest at top. Format: date — what was done / what's next / blockers.
 
+## 2026-06-27 — M8 CI/CD GitHub Actions (DONE)
+
+- **Done:** 3 new files. `.github/workflows/ci.yml` — single `build-test` job on `ubuntu-latest`: `go vet ./...`, `go test ./...`, `go build ./cmd/kopia-browser`; triggers on push to `main` + PR. `.github/workflows/docker-publish.yml` — builds + pushes `ghcr.io/nicojeske/kopia-browser` on `main` push and `v*` tags; `docker/metadata-action` for `latest`/`sha-<short>`/semver tags; `type=gha` layer cache. `.github/dependabot.yml` — weekly `gomod` + `github-actions` bumps. Updated PLAN.md (M8 DONE), DECISIONS.md (ADR), JOURNAL.md (this entry).
+- **Verified:** `go test ./...` ✅, `go build ./cmd/kopia-browser` ✅ (mirror CI steps). Workflows run after first GitHub push.
+- **One-time manual step:** After first push to GitHub, set GHCR package visibility to **public** (Packages → settings → "Change visibility") so k8s nodes can pull without an imagePullSecret. Or configure an imagePullSecret referencing a GHCR PAT.
+- **Next:** Project feature-complete. Push repo to `github.com/nicojeske/kopia-browser` to activate CI.
+- **Blockers:** no git remote configured yet (local-only repo).
+
 ## 2026-06-27 — M6 Docker (DONE)
 
 - **Done:** Multi-stage `Dockerfile` + `.dockerignore`. Builder: `golang:1.26`, `CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w"` → static binary at `/out/kopia-browser`. Runtime: `gcr.io/distroless/static-debian12:nonroot` (CA certs, no shell, uid 65532). Cache dir created in builder + `COPY --chown=65532:65532` into `/var/cache/kopia-browser` (distroless has no shell/mkdir). `ENV KOPIA_CACHE_DIR=/var/cache/kopia-browser` so it resolves absolute (required per manager.go). `EXPOSE 8080`, `USER nonroot`, `VOLUME ["/var/cache/kopia-browser"]`, `ENTRYPOINT ["/usr/local/bin/kopia-browser"]`. `.dockerignore` excludes `.git/`, `.env*`, `bin/`, `docs/`, `*.md`, `Makefile`; keeps `web/` for go:embed. Docs: PLAN.md M6 → DONE, DECISIONS.md M6 entry added.

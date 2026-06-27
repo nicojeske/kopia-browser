@@ -22,6 +22,7 @@ Single Go binary + htmx UI, deployed in k8s behind an SSO reverse proxy (no in-a
 | M5 UI refinement & E2E hardening | DONE |
 | M6 Docker + k8s | DONE |
 | M7 Dashboard stats & enriched sidebar | DONE |
+| M8 CI/CD (GitHub Actions) | DONE |
 
 Statuses: `TODO` → `IN PROGRESS` → `DONE`.
 
@@ -110,6 +111,14 @@ A feature isn't `DONE` until all three layers exist and their tests pass.
 ### M6 — Docker — `DONE`
 - [x] Multi-stage `Dockerfile` (distroless/scratch)
 - **Verify:** ✅ `docker build -t kopia-browser .`; `docker run --env-file .env` boots + serves `/healthz` → `ok`.
+
+### M8 — CI/CD (GitHub Actions) — `DONE`
+- [x] `.github/workflows/ci.yml` — quality gate: `go vet ./...` + `go test ./...` + `go build` on every push/PR to `main`
+- [x] `.github/workflows/docker-publish.yml` — build + push `ghcr.io/nicojeske/kopia-browser` on `main` push and `v*` tags; semver tagging via `docker/metadata-action`; GHA layer cache (`type=gha`)
+- [x] `.github/dependabot.yml` — weekly auto-PRs for `gomod` + `github-actions`
+- **Registry:** GHCR — uses built-in `GITHUB_TOKEN`, no extra secrets. Arch: `linux/amd64`.
+- **CI skips:** integration tests (needs garage creds) and E2E tests (needs Chrome) — both run locally only.
+- **Verify:** ✅ `go test ./...` + `go build ./cmd/kopia-browser` pass locally (mirror CI steps). After first GitHub push: `ci` workflow green; `docker-publish` pushes `:latest` + `:sha-<short>` to GHCR. Tag `v0.1.0` → `:0.1.0` / `:0.1` published.
 
 ## Out of scope
 - In-app auth (handled by SSO reverse proxy)

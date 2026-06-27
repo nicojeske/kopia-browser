@@ -2,6 +2,14 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-06-27 — M8 GitHub Actions / CI/CD
+
+- **GHCR over Docker Hub.** Uses built-in `GITHUB_TOKEN` (no extra secrets), co-located with the repo, native k8s imagePullPolicy behavior. `ghcr.io/nicojeske/kopia-browser`. No Docker Hub secrets to manage.
+- **amd64-only builds.** k8s nodes are x86_64. Multi-arch (QEMU/buildx arm64) would 2–3× build time with no concrete need. Easy to add later via `platforms: linux/amd64,linux/arm64`.
+- **Integration + E2E tests excluded from CI.** Integration tests need live garage S3 creds (read-only repo policy; no S3 secrets stored in GitHub). E2E tests need Chrome installed on the runner (heavier, run locally via `make e2e`). Unit tests (`go test ./...`, no build tags) are the CI gate.
+- **Release-on-tag folded into `docker-publish.yml` (no separate `release.yml`).** The `v*` tag trigger + `docker/metadata-action` semver patterns already handle versioned image publishing. A separate release workflow (GitHub Release notes) was out of scope.
+- **GHA layer cache (`type=gha`).** `cache-from/to: type=gha,mode=max` reuses Docker layer cache across runs. Go module cache via `actions/setup-go` `cache: true`. Both reduce cold-build time significantly.
+
 ## 2026-06-27 — M6 Docker image decisions
 
 - **`gcr.io/distroless/static-debian12:nonroot` as runtime base.** PLAN.md listed "distroless/scratch". `scratch` has no CA bundle, which matters for kopia/minio TLS S3 connections. `distroless/static-debian12` bundles CA certs + `/etc/passwd` (needed for UID lookup) and still has no shell. The `:nonroot` tag fixes uid 65532 (`nonroot`) as the default user — image runs unprivileged without an explicit `USER` override, though the Dockerfile states it explicitly for clarity.
