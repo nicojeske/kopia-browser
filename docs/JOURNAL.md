@@ -2,6 +2,13 @@
 > Append a short entry at the end of every working session so the next session resumes cleanly.
 > Newest at top. Format: date — what was done / what's next / blockers.
 
+## 2026-09-06 — Fix: stale "latest snapshot" from long-lived cached repo handle (DONE)
+
+- **Done:** Investigated a live report that `kopia.nicojeske.de` showed palworld's latest backup frozen at 2026-09-01 while Velero's Backup CRs and the raw kopia repo (checked directly via `kopia` CLI against the real garage bucket, connecting as Velero's `default@default` identity) both had daily snapshots through 09-05. Built the unmodified binary and ran it against real production data with a fresh empty cache dir — it immediately computed the correct 09-05 latest, isolating the bug to the long-running process rather than to snapshot-listing/aggregation logic. Traced to `Manager.open()` caching one `repo.Repository` per namespace forever without ever calling its `Refresh(ctx)` method, so a cache hit kept serving whatever index existed at first open. Fixed by calling `rep.Refresh(ctx)` on every cache hit (log-and-continue on error, matching the existing per-namespace error tolerance elsewhere). Added `TestListSnapshotsCacheHitRefreshesLive` (two `ListSnapshots` calls on one `Manager` against real garage) to guard the cache-hit path. Updated `docs/KOPIA.md` (new gotcha) and `docs/DECISIONS.md`.
+- **Verified:** `go vet ./...` ✅, `go test ./...` ✅, `go test -tags=integration ./internal/kopia/...` ✅ except `TestTarDirLive`, which fails identically on unmodified `main` (paperless's "consume" folder is currently empty in production — pre-existing, data-dependent, unrelated to this change).
+- **Next:** None outstanding from this session. Consider whether `TestTarDirLive`'s subdir choice should be made robust to empty directories (pick a non-empty one, or seed a fixture) — separate from this fix.
+- **Blockers:** none.
+
 ## 2026-06-27 — M8 CI/CD GitHub Actions (DONE)
 
 - **Done:** 3 new files. `.github/workflows/ci.yml` — single `build-test` job on `ubuntu-latest`: `go vet ./...`, `go test ./...`, `go build ./cmd/kopia-browser`; triggers on push to `main` + PR. `.github/workflows/docker-publish.yml` — builds + pushes `ghcr.io/nicojeske/kopia-browser` on `main` push and `v*` tags; `docker/metadata-action` for `latest`/`sha-<short>`/semver tags; `type=gha` layer cache. `.github/dependabot.yml` — weekly `gomod` + `github-actions` bumps. Updated PLAN.md (M8 DONE), DECISIONS.md (ADR), JOURNAL.md (this entry).

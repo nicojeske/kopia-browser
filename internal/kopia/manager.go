@@ -163,6 +163,17 @@ func (m *Manager) open(ctx context.Context, ns string) (repo.Repository, error) 
 
 	if rep, ok := m.repos[ns]; ok {
 		slog.Debug("kopia: repo cache hit", "ns", ns)
+		// A cached handle's content index reflects the repo as of when it was
+		// opened. Velero commits new snapshots from a separate process, so
+		// without an explicit Refresh this handle would keep serving the same
+		// snapshot list for the rest of the process's lifetime — verified live:
+		// a long-running instance froze "latest snapshot" for a namespace at a
+		// fixed date while a cold-opened instance against the same repo saw the
+		// true latest. Refresh just reloads the committed index blob list, so
+		// it's cheap relative to a cold Connect+Open.
+		if err := rep.Refresh(ctx); err != nil {
+			slog.Warn("kopia: refresh failed, serving cached index as-is", "ns", ns, "err", err)
+		}
 		return rep, nil
 	}
 

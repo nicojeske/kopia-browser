@@ -2,6 +2,13 @@
 
 > Append-only. Newest at top. One short entry per non-trivial decision: what + why.
 
+## 2026-09-06 — Fix: stale cached repo handle never refreshed
+
+- **Bug found live:** `kopia.nicojeske.de` showed palworld's latest snapshot frozen at 2026-09-01 for days while Velero kept completing daily backups (verified through 09-05 both in the Backup CRs and directly against the kopia repo via CLI). A cold-opened process against the same repo (fresh cache dir) immediately saw the correct 09-05 snapshot, isolating the bug to the long-lived process, not the data.
+- **Root cause:** `Manager.open()` caches one `repo.Repository` per namespace for the process lifetime (`m.repos[ns]`). `repo.Repository` exposes `Refresh(ctx) error` ("reloads the committed content indexes") specifically because a long-lived read-only handle does not automatically see content committed by another writer (Velero) — but `open()` never called it, so a cache hit kept serving whatever snapshot list existed at first-open, indefinitely.
+- **Fix:** `open()` now calls `rep.Refresh(ctx)` on every cache hit before returning the handle, logging (not failing) on error — matches the existing per-namespace error-tolerance pattern in `stats.go`. Cheap relative to a cold Connect+Open since it only reloads the index blob list, not the full manifest set.
+- **Verified:** `internal/kopia/manager_integration_test.go` — new `TestListSnapshotsCacheHitRefreshesLive` calls `ListSnapshots` twice on one `Manager` (cold open, then cache hit) against real garage; asserts the cache-hit call doesn't lose data. All existing unit + integration tests still pass (`TestTarDirLive` failure is a pre-existing, unrelated data-dependent flake — paperless's "consume" ingest folder is currently empty in production; reproduced identically on unmodified `main`).
+
 ## 2026-06-27 — M8 GitHub Actions / CI/CD
 
 - **GHCR over Docker Hub.** Uses built-in `GITHUB_TOKEN` (no extra secrets), co-located with the repo, native k8s imagePullPolicy behavior. `ghcr.io/nicojeske/kopia-browser`. No Docker Hub secrets to manage.

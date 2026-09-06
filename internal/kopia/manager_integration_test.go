@@ -86,6 +86,33 @@ func TestListSnapshotsLive(t *testing.T) {
 	t.Logf("distinct volumes in paperless (%d snapshots): %v", len(snaps), volSet)
 }
 
+// TestListSnapshotsCacheHitRefreshesLive exercises the cache-hit branch of
+// Manager.open (second+ call for a namespace within one process). A live
+// instance was observed to freeze its "latest snapshot" for a namespace at a
+// fixed date indefinitely, while a cold-opened instance against the same repo
+// saw the true latest — the cached repo.Repository handle's content index
+// wasn't being refreshed. open() now calls rep.Refresh on every cache hit;
+// this asserts that path still returns without error and without losing data.
+func TestListSnapshotsCacheHitRefreshesLive(t *testing.T) {
+	mgr, _ := testManager(t)
+	ctx := context.Background()
+
+	first, err := mgr.ListSnapshots(ctx, "paperless")
+	if err != nil {
+		t.Fatalf("ListSnapshots (cold open): %v", err)
+	}
+
+	// Second call reuses the cached repo handle and must go through Refresh.
+	second, err := mgr.ListSnapshots(ctx, "paperless")
+	if err != nil {
+		t.Fatalf("ListSnapshots (cache hit): %v", err)
+	}
+
+	if len(second) < len(first) {
+		t.Errorf("cache-hit call returned fewer snapshots (%d) than cold open (%d)", len(second), len(first))
+	}
+}
+
 func TestDirLive(t *testing.T) {
 	mgr, _ := testManager(t)
 	ctx := context.Background()
