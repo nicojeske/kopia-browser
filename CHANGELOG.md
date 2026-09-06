@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/nicojeske/kopia-browser/compare/v1.1.0...v1.1.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* refresh cached repo handle on every access, not just first open ([92e251e](https://github.com/nicojeske/kopia-browser/commit/92e251ed9af38aa204a92ea7c7ef923b66078d96))
+
 ## [1.1.0](https://github.com/nicojeske/kopia-browser/compare/v1.0.0...v1.1.0) (2026-06-27)
 
 
